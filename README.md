@@ -47,10 +47,7 @@ Note, images do not render well in VSCode, so open Jupyter Lab or Jupyter Notebo
 
 The project includes a comprehensive test suite using pytest. To run the tests:
 
-1. Install test dependencies:
-    ```bash
-    pip install -r test-requirements.txt
-    ```
+1. Set up the venv as above
 
 2. Run all tests:
     ```bash
