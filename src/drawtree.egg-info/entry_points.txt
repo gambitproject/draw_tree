@@ -1,0 +1,2 @@
+[console_scripts]
+drawtree = drawtree.cli:main

@@ -1,3 +1,35 @@
+Metadata-Version: 2.4
+Name: drawtree
+Version: 1.1.0
+Summary: Generate TikZ code for game trees from extensive form (.ef) files
+Author: Game Tree Drawing Project
+License: MIT
+Project-URL: Homepage, https://github.com/your-username/drawtree
+Project-URL: Repository, https://github.com/your-username/drawtree.git
+Project-URL: Issues, https://github.com/your-username/drawtree/issues
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Topic :: Scientific/Engineering :: Mathematics
+Classifier: Topic :: Text Processing :: Markup :: LaTeX
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Provides-Extra: jupyter
+Requires-Dist: jupyter; extra == "jupyter"
+Requires-Dist: jupyter-tikz; extra == "jupyter"
+Dynamic: requires-python
+
 # DrawTree: Game Tree Visualization Package
 
 A modern Python package for generating beautiful game tree diagrams from extensive form (.ef) files. Creates TikZ-based visualizations that can be rendered as PDF, PNG, or used directly in LaTeX documents and Jupyter notebooks.
