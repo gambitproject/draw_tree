@@ -1,0 +1,28 @@
+player 1 name 1
+player 2 name 2
+level 0 node 1 player 0 
+level 2 node 1 player 1 xshift -aa=2.7 from 0,1 move \frac{1}{2}~
+level 2 node 2 player 1 xshift aa from 0,1 move ~\frac{1}{2} 
+% level 2 node 1  xshift -aa=2.7 from 0,1 move \frac{1}{2}~
+% level 2 node 2  xshift aa from 0,1 move ~\frac{1}{2} 
+% iset 2,1 player 1
+% iset 2,2 player 1
+level 4 node 1 xshift -a=1.01 from 2,1 move A 
+level 8 node 1 xshift 3a from 2,1 move B 
+level 4 node 2 xshift -c=1.01 from 2,2 move C 
+level 8 node 2 xshift 3c from 2,2 move D 
+level 6 node 1 xshift -d=1.01 from 4,1 move l 
+level 6 node 2 xshift d from 4,1 move r 
+level 6 node 3 xshift -b=0.7 from 4,2 move l payoffs 0 0
+level 6 node 4 xshift b from 4,2 move r payoffs 1 0
+level 10 node 1 xshift -b from 8,1 move s payoffs 1 0
+level 10 node 2 xshift b from 8,1 move t payoffs 0 0
+level 10 node 3 xshift -b from 8,2 move s payoffs 0 0
+level 10 node 4 xshift b from 8,2 move t payoffs 1 0
+level 8 node 3 xshift -bb=.5 from 6,1 move E payoffs 5 0
+level 8 node 4 xshift -bb from 6,2 move E payoffs 0 0
+level 8 node 5 xshift bb from 6,2 move F payoffs 4 0
+level 8 node 6 xshift bb from 6,1 move F payoffs 1 0
+iset 8,1 8,2 player 2
+iset 4,1 4,2 player 2
+iset 6,1 6,2 player 1
