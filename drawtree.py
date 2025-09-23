@@ -805,40 +805,7 @@ def create_tikz_from_file(tex_file_path, macros_file_path="macros-drawtree.tex")
     except FileNotFoundError:
         print(f"Error: Could not find file {tex_file_path}")
         return ""
-    
-    # Create wrapper document with tex_file_path substituted for o.tex
-    tikz_content = f"""% wrapper file for game tree drawing 
-                        \\documentclass[a4paper,12pt]{{article}}
-                        % \\usepackage{{mathptmx}}
-                        \\usepackage{{newpxtext,newpxmath}}
-                        \\linespread{{1.10}}        % Palatino needs more leading (space between lines) 
-                        \\usepackage{{graphicx}}
-                        \\usepackage{{tikz}}
-                        % \\usepackage{{bimatrixgame}}
-                        \\usetikzlibrary{{shapes}}
-                        \\usetikzlibrary{{arrows.meta}}
-                        \\oddsidemargin=.46cm 
-                        \\textwidth=15cm
-                        \\textheight=24cm
-                        \\topmargin=-1.3cm
-                        \\parindent 0pt
-                        \\parskip1ex
-                        \\pagestyle{{empty}}
 
-                        \\input macros-drawtree
-
-                        \\begin{{document}}
-
-                        \\hrule
-
-                        % Game tree content from {tex_file_path}
-                        {tikz_content}
-
-                        \\hrule
-
-                        \\end{{document}}
-                    """
-    
     # Extract macro definitions from the macros file
     macro_lines = []
     for line in macros_content.split("\n"):
