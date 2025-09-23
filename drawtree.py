@@ -1,107 +1,169 @@
 #!/usr/bin/python
-# assumes python 2 but should work with python 3;
-# print is used in a single place
-# drawing tree as tikz file from .ef file
-# version 1.0.5
-from __future__ import print_function
+"""
+Game tree drawing as TikZ file from .ef file
+Version 1.0.5
+
+This module provides functionality to generate TikZ code for game trees
+from extensive form (.ef) files, with support for Jupyter notebooks.
+"""
+from __future__ import annotations
 
 import sys
-import math 
+import math
+from typing import List, Optional 
 
-# constants
-DEFAULTFILE = "example.ef"
-scale = 1
-grid = False
+# Constants
+DEFAULTFILE: str = "example.ef"
+scale: float = 1
+grid: bool = False
 
-maxplayer = 4
-payup = 0.1   # fraction of paydown to shift first payoff up
-radius = 0.3   # iset radius
-# up to 4 players and chance (in principle more)
-# default names
-playername = [r"\small chance", "1", "2", "3", "4"]
-playertexname = ["playerzero", "playerone", "playertwo", "playerthree", "playerfour"]
-# player names that need to be defined in TeX
-playerdefined = [False] * (maxplayer+1)
+maxplayer: int = 4
+payup: float = 0.1   # fraction of paydown to shift first payoff up
+radius: float = 0.3   # iset radius
 
-# tikz/TeX constants used, defined in TeX file, not here
-paydown = "\\paydown"  # 2.5ex % yshift payoffs down
-yup = "\\yup" # 0.5mm % yshift up for moves
-yfracup = "\\yfracup" # 0.8mm % yshift up for chance probabilities
-spx = "\\spx" # 1mm % single player node xshift
-spy = "\\spy" # .5 mm % single player node yshift
-ndiam = "\\ndiam" # 1.5mm % node diameter disks
-sqwidth = "\\sqwidth" # 1.6 mm % node diameter disks
-# thickn = "\\thickn" # {very thick} % line thickness
-thickn = "line width=\\treethickn" # {1pt} % line thickness
-chancecolor = "\\chancecolor" # gray color of chance node
+# Up to 4 players and chance (in principle more)
+# Default names
+playername: List[str] = [r"\small chance", "1", "2", "3", "4"]
+playertexname: List[str] = ["playerzero", "playerone", "playertwo", "playerthree", "playerfour"]
+# Player names that need to be defined in TeX
+playerdefined: List[bool] = [False] * (maxplayer + 1)
 
-numepsilon = 1e-9 # checking for almost equality
+# TikZ/TeX constants used, defined in TeX file, not here
+paydown: str = "\\paydown"  # 2.5ex % yshift payoffs down
+yup: str = "\\yup"  # 0.5mm % yshift up for moves
+yfracup: str = "\\yfracup"  # 0.8mm % yshift up for chance probabilities
+spx: str = "\\spx"  # 1mm % single player node xshift
+spy: str = "\\spy"  # .5 mm % single player node yshift
+ndiam: str = "\\ndiam"  # 1.5mm % node diameter disks
+sqwidth: str = "\\sqwidth"  # 1.6 mm % node diameter disks
+thickn: str = "line width=\\treethickn"  # {1pt} % line thickness
+chancecolor: str = "\\chancecolor"  # gray color of chance node
 
-# isetparams="fill=blue, opacity=0.3"  # parameters for info set drawings
-isetparams=""  # draw parameters for info set drawings
+numepsilon: float = 1e-9  # checking for almost equality
 
-# all dimensions in cm
-isetradius = 0.3
-# elongated single iset in which direction
-xsingleiset = 0.4
-ysingleiset = 0.0
+# Parameters for info set drawings
+isetparams: str = ""  # draw parameters for info set drawings
 
-# how to indent
-joinstring = "\n    " 
+# All dimensions in cm
+isetradius: float = 0.3
+# Elongated single iset in which direction
+xsingleiset: float = 0.4
+ysingleiset: float = 0.0
 
-######### output routines
-allowcomments = True
+# How to indent
+joinstring: str = "\n    "
 
-outstream = []
-stream0 = []
+# Output routines
+allowcomments: bool = True
 
-# output stream to stdout
-def outall(stream=outstream):
+outstream: List[str] = []
+stream0: List[str] = []
+
+
+def outall(stream: Optional[List[str]] = None) -> None:
+    """
+    Output stream to stdout.
+    
+    Args:
+        stream: List of strings to output. Defaults to global outstream.
+    """
+    if stream is None:
+        stream = outstream
     for s in stream:
-        print (s)
-    return
+        print(s)
 
-# output single string
-def outs(s, stream=outstream):
+
+def outs(s: str, stream: Optional[List[str]] = None) -> None:
+    """
+    Output single string to stream.
+    
+    Args:
+        s: String to append to stream.
+        stream: Target stream list. Defaults to global outstream.
+    """
+    if stream is None:
+        stream = outstream
     stream.append(s)
-    return
 
-# output list of strings
-def outlist(l):
+
+def outlist(string_list: List[str]) -> None:
+    """
+    Output list of strings to global outstream.
+    
+    Args:
+        string_list: List of strings to append to global outstream.
+    """
     global outstream
-    outstream += l
-    return
+    outstream += string_list
 
-# LaTeX command for defining something
-def defout(defname, meaning):
-    # tikz output (TeX definition, consider changing to
-    # LaTeX \newcommand* )
+
+def defout(defname: str, meaning: str) -> None:
+    """
+    LaTeX command for defining something.
+    
+    Args:
+        defname: Name of the definition.
+        meaning: Value/meaning of the definition.
+        
+    Note:
+        Outputs TeX definition. Consider changing to LaTeX \\newcommand*.
+    """
     outs("\\def\\" + defname + "{" + meaning + "}")
-    return
 
-# LaTeX command for creating a dimension
-# maybe not here
-def newdimen(dimname, value):
-    # tikz output
+
+def newdimen(dimname: str, value: str) -> None:
+    """
+    LaTeX command for creating a dimension.
+    
+    Args:
+        dimname: Name of the dimension.
+        value: Value of the dimension.
+    """
     outs("\\newdimen\\" + dimname)
     outs("\\" + dimname + value)
-    return
 
-# output comment if not suppressed
-def comment(s):
-    # tikz code (LaTeX comment)
+
+def comment(s: str) -> None:
+    """
+    Output comment if not suppressed.
+    
+    Args:
+        s: Comment text to output.
+    """
     if allowcomments:
-        outs("%% "+s)
-    return
+        outs("%% " + s)
 
-def error(s, stream=outstream): # errors not suppressed
-    outs("% ----- Error: "+s, stream)
-    return
 
-# read file lines, stripped of blanks at end, if non-empty, into list
-# http://stackoverflow.com/questions/12330522/reading-a-file-without-newlines
-def readfile(filename):
-    temp = open(filename, 'r').read().splitlines()
+def error(s: str, stream: Optional[List[str]] = None) -> None:
+    """
+    Output error message (errors not suppressed).
+    
+    Args:
+        s: Error message text.
+        stream: Target stream. Defaults to global outstream.
+    """
+    if stream is None:
+        stream = outstream
+    outs("% ----- Error: " + s, stream)
+
+def readfile(filename: str) -> List[str]:
+    """
+    Read file lines, stripped of blanks at end, if non-empty, into list.
+    
+    Args:
+        filename: Path to file to read.
+        
+    Returns:
+        List of non-empty, stripped lines from the file.
+        
+    Raises:
+        FileNotFoundError: If the file doesn't exist.
+        
+    Reference:
+        http://stackoverflow.com/questions/12330522/reading-a-file-without-newlines
+    """
+    with open(filename, 'r') as file:
+        temp = file.read().splitlines()
     out = []
     for line in temp:
         line = line.strip()
@@ -109,88 +171,203 @@ def readfile(filename):
             out.append(line)
     return out
 
-# float format to [default 3] places, remove trailing ".0"
-def fformat(x, places=3):
+
+def fformat(x: float, places: int = 3) -> str:
+    """
+    Format float to specified places, remove trailing ".0".
+    
+    Args:
+        x: Number to format.
+        places: Number of decimal places (default: 3).
+        
+    Returns:
+        Formatted string representation of the number.
+        
+    Examples:
+        >>> fformat(3.14159)
+        '3.142'
+        >>> fformat(3.0)
+        '3'
+        >>> fformat(3.100, 2)
+        '3.1'
+    """
     fstring = "%." + ("%df" % places)
     s = fstring % x
-    if places > 0 :
+    if places > 0:
         s = s.rstrip("0")
         s = s.rstrip(".")
     return s
 
-# coordinates as pair: 3,4 -> "(3,4)"
-def coord(x,y):
-    return "("+ fformat(x)+","+fformat(y)+")"
 
-# Euclidean length of vector
-def twonorm(v):
-    l = 0.0
+def coord(x: float, y: float) -> str:
+    """
+    Format coordinates as pair: 3,4 -> "(3,4)".
+    
+    Args:
+        x: X coordinate.
+        y: Y coordinate.
+        
+    Returns:
+        Formatted coordinate string.
+        
+    Examples:
+        >>> coord(1.0, 2.0)
+        '(1,2)'
+    """
+    return "(" + fformat(x) + "," + fformat(y) + ")"
+
+
+def twonorm(v: List[float]) -> float:
+    """
+    Calculate Euclidean length of vector.
+    
+    Args:
+        v: Vector as list of coordinates.
+        
+    Returns:
+        Euclidean length of the vector.
+        
+    Examples:
+        >>> twonorm([3, 4])
+        5.0
+    """
+    length = 0.0
     for x in v:
-        l += x**2
-    return l**0.5
+        length += x**2
+    return length**0.5
 
-# stretch to desired length (must be >= 0)
-def stretch (v,length=1):
-    currl = twonorm (v)
-    if currl == 0.0: return v
+
+def stretch(v: List[float], length: float = 1) -> List[float]:
+    """
+    Stretch vector to desired length (must be >= 0).
+    
+    Args:
+        v: Input vector.
+        length: Desired length (default: 1).
+        
+    Returns:
+        Stretched vector with specified length.
+        
+    Raises:
+        AssertionError: If the result doesn't have the expected length.
+    """
+    currl = twonorm(v)
+    if currl == 0.0:
+        return v
     out = []
     for x in v:
-        out.append(x*length/currl)
-    assert aeq(twonorm(out),length) 
-    return out 
+        out.append(x * length / currl)
+    assert aeq(twonorm(out), length)
+    return out
 
-# angle of vector in degrees in (-180,180]
-def degrees (v):
-    currl = twonorm (v)
-    if aeq(currl): return 0
+
+def degrees(v: List[float]) -> float:
+    """
+    Calculate angle of vector in degrees in (-180,180].
+    
+    Args:
+        v: Vector as list of coordinates.
+        
+    Returns:
+        Angle in degrees.
+    """
+    currl = twonorm(v)
+    if aeq(currl):
+        return 0
     onunitcircle = stretch(v)
     x = onunitcircle[0]
     y = onunitcircle[1]
-    xd = math.acos(x)*180/math.pi
-    if y<0:
-        return -xd # in (-180,0)
-    return xd # in [0,180]
+    xd = math.acos(x) * 180 / math.pi
+    if y < 0:
+        return -xd  # in (-180,0)
+    return xd  # in [0,180]
 
-# almost equal (or equal to zero) numerically
-def aeq(x,y=0):
-    return abs(x-y) < numepsilon
 
-# determinant
-def det(a,b,c,d):
-    return a*d - b*c
+def aeq(x: float, y: float = 0) -> bool:
+    """
+    Test if numbers are almost equal (or equal to zero) numerically.
+    
+    Args:
+        x: First number.
+        y: Second number (default: 0).
+        
+    Returns:
+        True if numbers are approximately equal.
+    """
+    return abs(x - y) < numepsilon
 
-# is b on the line segment [a,c]?
-def isonlineseg(a,b,c):
+
+def det(a: float, b: float, c: float, d: float) -> float:
+    """
+    Calculate determinant of 2x2 matrix.
+    
+    Args:
+        a, b, c, d: Matrix elements [[a, b], [c, d]].
+        
+    Returns:
+        Determinant value (ad - bc).
+    """
+    return a * d - b * c
+
+def isonlineseg(a: List[float], b: List[float], c: List[float]) -> bool:
+    """
+    Check if point b lies on the line segment [a,c].
+    
+    Args:
+        a: Starting point as [x, y] coordinates.
+        b: Point to test as [x, y] coordinates.
+        c: Ending point as [x, y] coordinates.
+        
+    Returns:
+        True if point b is on the line segment from a to c, False otherwise.
+    """
     bx=b[0]-a[0]
     by=b[1]-a[1]
     cx=c[0]-a[0]
     cy=c[1]-a[1]
-    if aeq(bx) and aeq(by) : return True  # a near b
+    if aeq(bx) and aeq(by):
+        return True  # a near b
     if aeq( bx*cy - by*cx ): # collinear
         if aeq(cx) and aeq(cy) : # a near c but not near b
             return False
         if aeq(cx): # look at y coordinate
-            if aeq(by,cy) : return True  # c near b 
-            if cy >= 0: return (by >= 0) and (by <= cy)
+            if aeq(by,cy):
+                return True  # c near b 
+            if cy >= 0:
+                return (by >= 0) and (by <= cy)
             # cy < 0
             return (by <= 0) and (by >= cy)
         # nonzero x coordinate of c, gives info
-        if aeq(bx,cx) : return True  # c near b 
-        if cx > 0: return (bx >= 0) and (bx <= cx)
+        if aeq(bx,cx):
+            return True  # c near b 
+        if cx > 0:
+            return (bx >= 0) and (bx <= cx)
         # cx < 0
         return (bx <= 0) and (bx >= cx)
     # not collinear
     return False
 
-# create arc or point around point b in a,b,c
-def makearc(a,b,c,radius=isetradius):
+def makearc(a: List[float], b: List[float], c: List[float], radius: float = isetradius) -> str:
+    """
+    Create arc or point around point b in triangle a,b,c.
+    
+    Args:
+        a: First point as [x, y] coordinates.
+        b: Center point as [x, y] coordinates.
+        c: Third point as [x, y] coordinates.
+        radius: Radius for the arc. Defaults to isetradius.
+        
+    Returns:
+        TikZ coordinate string for the arc or point.
+    """
     s = stretch([ b[1]-a[1], a[0]-b[0] ], radius)
     t = stretch([ c[1]-b[1], b[0]-c[0] ], radius)
     # print "% s,t    ", s,t
     sangle = degrees(s)
     tangle = degrees(t)
     # make sure to turn anticlockwise
-    if tangle < sangle : tangle += 360
+    if tangle < sangle:
+        tangle += 360
     sx = b[0] + s[0]
     sy = b[1] + s[1]
     # tikz code
@@ -240,12 +417,23 @@ def makearc(a,b,c,radius=isetradius):
                     out = coord(x,y)
     return out 
 
-# create a list of strings that is the sequence of tikz drawing
-# commands around a list of coordinate pairs [x,y]
-# not including the "draw" and ";" start and end parts 
-def arcseq(nodes,radius=isetradius): 
+def arcseq(nodes: List[List[float]], radius: float = isetradius) -> List[str]:
+    """
+    Create a list of TikZ drawing commands around a list of coordinate pairs.
+    
+    Creates a sequence of arcs around the given nodes, removing collinear points
+    and handling singleton information sets appropriately.
+    
+    Args:
+        nodes: List of coordinate pairs [x,y].
+        radius: Radius for the arcs. Defaults to isetradius.
+        
+    Returns:
+        List of TikZ command strings (without "draw" and ";" wrapper).
+    """ 
     nodes = nodes[:] # protect nodes parameter, now a local variable
-    if len(nodes) == 0: return [""];
+    if len(nodes) == 0:
+        return [""]
     if len(nodes) == 1: # singleton info set
         x = nodes[0][0]
         y = nodes[0][1]
@@ -276,26 +464,43 @@ def arcseq(nodes,radius=isetradius):
         out.append(makearc(tour[i-1],tour[i],tour[i+1],radius))
     return out  
 
-# create a list of strings that is the sequence of tikz drawing
-# commands around a list of coordinate pairs [x,y]
-# including the "draw" and ";" start and end parts 
-def iset (nodes,radius=isetradius): 
+def iset(nodes: List[List[float]], radius: float = isetradius) -> str:
+    """
+    Create complete TikZ drawing commands for an information set.
+    
+    Args:
+        nodes: List of coordinate pairs [x,y].
+        radius: Radius for the arcs. Defaults to isetradius.
+        
+    Returns:
+        Complete TikZ draw command string with semicolon.
+    """ 
     arcs = arcseq(nodes,radius)
     # tikz code 
     return "\\draw [" + isetparams + "] " + "\n  -- ".join(arcs) + " -- cycle;"
 
 ######################## handling players
 
-# parse "player" command
-# writeout player definition if player named or used first time
-# returns p,advance (in words list afterwards)
-def player(words):
+def player(words: List[str]) -> tuple[int, int]:
+    """
+    Parse 'player' command and handle player definitions.
+    
+    Processes player number and optional name, writing out player definition
+    if the player is named or used for the first time.
+    
+    Args:
+        words: List of command words starting with 'player'.
+        
+    Returns:
+        Tuple of (player_number, advance_count) where advance_count is 
+        the number of words consumed from the input.
+    """
     p = -1  # illegal player
     advance = len(words)
     assert words[0] == "player"
     try:
         x = int(words[1])
-    except:
+    except ValueError:
         error("need player number after 'player'")
         return p, advance
     if x < 0 or x > maxplayer:
@@ -326,10 +531,25 @@ def player(words):
 nodes = {}
 xshifts = {}
 
-# finds x,text where x = prefix defining a nonnegative number
-# 2a -> 2,"a"  ".3xyz" -> .3,"xyz"
-# if no number, return 1: "a" -> 1,"a"
-def splitnumtext(s):
+def splitnumtext(s: str) -> tuple[float, str]:
+    """
+    Split a string into numeric prefix and text remainder.
+    
+    Extracts a leading number (including decimal) from a string and returns
+    both the number and the remaining text.
+    
+    Args:
+        s: Input string to parse.
+        
+    Returns:
+        Tuple of (number, remainder_text). If no number is found, 
+        returns (1, original_string).
+        
+    Examples:
+        "2.3abc" -> (2.3, "abc")
+        ".1b" -> (0.1, "b") 
+        "a" -> (1, "a")
+    """
     nodotyet = True
     tonum = ""
     remainder = ""
@@ -352,8 +572,22 @@ def splitnumtext(s):
     #     print s, splitnumtext(s)
     # quit()
 
-# parse "xshift" command
-def xshift(words):
+def xshift(words: List[str]) -> tuple[float, float, int]:
+    """
+    Parse 'xshift' command to determine horizontal positioning.
+    
+    Handles xshift assignments and lookups, including named xshift variables
+    and coefficient multipliers.
+    
+    Args:
+        words: List of command words starting with 'xshift'.
+        
+    Returns:
+        Tuple of (x_shift, factor, advance_count) where:
+        - x_shift: The calculated horizontal shift value
+        - factor: The coefficient factor for scaling
+        - advance_count: Number of words consumed (always 2)
+    """
     assert words[0] == "xshift"
     xs = 0
     advance = len(words)
@@ -371,7 +605,7 @@ def xshift(words):
     if assignment:
         try:
             num = float(a[1])
-        except:
+        except ValueError:
             error("assigment '"+ a[1] + "' must be a number")
             return xs, 1, advance
         coeff, xsname = splitnumtext(a[0])
@@ -383,7 +617,7 @@ def xshift(words):
     else:
         coeff, xsname = splitnumtext(a[0])
         if xsname: # uses a name
-            if not xsname in xshifts:
+            if xsname not in xshifts:
                 error("xshift '" + xsname + "' undefined")
                 return xs, 1, advance
             num = coeff * xshifts[xsname]
@@ -413,9 +647,17 @@ def xshift(words):
     #     print outstream
     # quit()
 
-# parse "from" command
-# return fromn,advance
-def fromnode(words):
+def fromnode(words: List[str]) -> tuple[str, int]:
+    """
+    Parse 'from' command to identify parent node.
+    
+    Args:
+        words: List of command words starting with 'from'.
+        
+    Returns:
+        Tuple of (parent_node_id, advance_count) where parent_node_id
+        is the cleaned node identifier and advance_count is words consumed.
+    """
     assert words[0] == "from"
     advance = len(words)
     fromn = ""
@@ -423,16 +665,26 @@ def fromnode(words):
         error("need node name after 'from'")
         return fromn, advance
     s = cleannodeid(words[1])
-    if not s in nodes:
+    if s not in nodes:
         error("node "+s+" after 'from' is not defined")
     else:
         fromn = s
         advance = 2
     return fromn, advance
 
-# parse "move" command
-# return move, movpos, convex, advance
-def move(words):
+def move(words: List[str]) -> tuple[str, str, float, int]:
+    """
+    Parse 'move' command to extract move name and positioning.
+    
+    Handles move syntax like "move:Left:0.3" where the colon-separated parts
+    specify positioning and convexity parameters.
+    
+    Args:
+        words: List of command words starting with 'move'.
+        
+    Returns:
+        Tuple of (move_name, move_position, convex_value, advance_count).
+    """
     assert words[0][:4] == "move"
     advance = len(words)
     mov = ""
@@ -448,7 +700,7 @@ def move(words):
                 error("Move position in [0,1] required")
             else:
                 convex = num
-        except:
+        except ValueError:
             error("Move position in [0,1] required")
     if len(words) < 2:
         error("need move name after 'move'")
@@ -463,9 +715,16 @@ def move(words):
     # outall()
     # quit ("done testing.")
 
-# parse "arrow" command
-# return arrowpos, arrowcolor, advance
-def arrow(words):
+def arrow(words: List[str]) -> tuple[float, str, int]:
+    """
+    Parse 'arrow' command to extract arrow positioning and color.
+    
+    Args:
+        words: List of command words starting with 'arrow'.
+        
+    Returns:
+        Tuple of (arrow_position, arrow_color, advance_count).
+    """
     assert words[0][:5] == "arrow"
     a = words[0].split(":")
     if len(a) > 1:
@@ -473,20 +732,27 @@ def arrow(words):
     else:
         arrowcolor = ""
     arrowpos = 0.5
+    advance = 2  # Default advance value
     try:
         num = float(words[1])
         if num < 0 or num > 1:
             error("Arrow position in [0,1] required, using 0.5")
         else:
             arrowpos = num
-    except:
+    except Exception:
         error("Arrow position in [0,1] required, using 0.5")
-    advance = 2
     return arrowpos, arrowcolor, advance
 
-# parse "payoffs" command
-# return list of payoff strings for tikz output
-def payoffs(words):
+def payoffs(words: List[str]) -> List[str]:
+    """
+    Parse 'payoffs' command to generate TikZ payoff display code.
+    
+    Args:
+        words: List of command words starting with 'payoffs'.
+        
+    Returns:
+        List of TikZ node commands for displaying payoffs.
+    """
     assert words[0] == "payoffs"
     maxp = len(words)
     if len(words) > maxplayer+1:
@@ -511,9 +777,19 @@ def payoffs(words):
     #     print s
     # quit()
 
-# draw node, player for square (0) or disk (not 0)
-# colors could be added later
-def drawnode(v, player=1):
+def drawnode(v: List[float], player: int = 1) -> str:
+    """
+    Generate TikZ code to draw a game tree node.
+    
+    Creates either a square (for chance/player 0) or circle (for other players).
+    
+    Args:
+        v: Node position as [x, y] coordinates.
+        player: Player number (0 for chance node, >0 for player node).
+        
+    Returns:
+        TikZ node command string.
+    """
     # tikz code
     out = "\\node[inner sep=0pt,minimum size="
     if player == 0:
@@ -525,8 +801,13 @@ def drawnode(v, player=1):
     outs(out)
     return out
 
-# return list of all nodes to be drawn
-def drawnodes():
+def drawnodes() -> None:
+    """
+    Draw all inner (non-leaf) nodes in the game tree.
+    
+    Iterates through all nodes and draws those marked as 'inner' nodes
+    using appropriate shapes based on player type.
+    """
     for n in nodes:
         if nodes[n]["inner"]:
             v = [nodes[n]["x"], nodes[n]["y"]]
@@ -534,12 +815,29 @@ def drawnodes():
             drawnode(v, p)
     return
 
-# create node id from level (a float) and
-def setnodeid(lev, s):
+def setnodeid(lev: float, s: str) -> str:
+    """
+    Create node identifier from level and name.
+    
+    Args:
+        lev: Level number (typically a float).
+        s: Name string for the node.
+        
+    Returns:
+        Formatted node identifier string "level,name".
+    """
     return fformat(lev)+","+s
 
-# standardize node id from "lev,s"
-def cleannodeid(ns):
+def cleannodeid(ns: str) -> str:
+    """
+    Standardize node id from "level,name" format.
+    
+    Args:
+        ns: Node string in "level,name" format.
+        
+    Returns:
+        Standardized node identifier.
+    """
     a = ns.split(",")
     if len(a) < 2:
         error("missing comma in '"+ns+"', using empty node id")
@@ -548,8 +846,8 @@ def cleannodeid(ns):
         s = a[1]
     try:
         lev = float(a[0])
-    except:
-        error("Unknown level '"+a[0]+"' in '"+ns+"', using 0")
+    except Exception:
+        error("Level must be a number, using 0")
         lev = 0
     return setnodeid(lev, s)
     # # testing
@@ -569,22 +867,32 @@ def cleannodeid(ns):
 # "payoffs" list of payoffs, comes last
 # "inner" boolean: inner node, draw disk/square
 
-def level(words):
+def level(words: List[str]) -> None:
+    """
+    Process a complete level command to create a game tree node.
+    
+    This is the main parsing function that handles the 'level' command and all
+    its associated sub-commands (player, xshift, from, move, payoffs, arrow).
+    Creates TikZ output for drawing the node and connecting lines.
+    
+    Args:
+        words: List of command words starting with 'level'.
+    """
     assert words[0] == "level"
     try:
         lev = float(words[1])
-    except:
-        error("need level number after 'level'")
+    except Exception:
+        error("Level must be a number")
         return
     try:
         assert words[2] == "node"
-    except:
-        error("expect keyword 'node' as word 3")
+    except Exception:
+        error("Expected 'node' keyword")
         return
     try:
         s = words[3]
-    except:
-        error("expect node identifier as word 4")
+    except Exception:
+        error("Expected node name")
         return
     nodeid = setnodeid(lev, s)
     count = 4
@@ -629,6 +937,8 @@ def level(words):
     # create x coordinate
     # existsfrom = not (fromn == "") and (fromn in nodes)
     existsfrom = (fromn in nodes)
+    xfrom = 0.0  # Initialize to avoid unbound variable warnings
+    yfrom = 0.0  # Initialize to avoid unbound variable warnings
     if existsfrom: # father exists
         xfrom = nodes[fromn]["x"]
         yfrom = nodes[fromn]["y"]
@@ -701,7 +1011,16 @@ def level(words):
 
 ######################## isets
 
-def isetgen(words):
+def isetgen(words: List[str]) -> None:
+    """
+    Process 'iset' command to generate information set visualization.
+    
+    Creates TikZ code to draw information sets (connecting multiple nodes
+    that belong to the same player and decision point).
+    
+    Args:
+        words: List of command words starting with 'iset'.
+    """
     assert words[0] == "iset"
     nodelist = []
     p = -1
@@ -714,7 +1033,7 @@ def isetgen(words):
             count += advance
         else:
             nodeid = cleannodeid(words[count])
-            if not nodeid in nodes:
+            if nodeid not in nodes:
                 error(" ".join(words)+" :", stream0)
                 error("Node '"+nodeid+"' in iset not defined", stream0)
             else:
@@ -756,8 +1075,16 @@ def isetgen(words):
 
 ########### command-line arguments
 
-# sets ef_file, scale, grid
-def commandline(argv): # process command-line args
+def commandline(argv: List[str]) -> None:
+    """
+    Process command-line arguments to set global configuration.
+    
+    Sets global variables for ef_file, scale, and grid based on
+    command-line arguments.
+    
+    Args:
+        argv: List of command-line arguments (including script name).
+    """
     global grid
     global scale 
     global ef_file
@@ -770,7 +1097,7 @@ def commandline(argv): # process command-line args
                     scale = num
                 else: 
                     outs("% Command-line argument 'scale=x' needs x in 0.01 .. 100", stream0)
-            except:
+            except Exception:
                 outs("% Command-line argument 'scale=x' needs x in 0.01 .. 100", stream0)
         elif arg == "grid":
             grid = True
@@ -813,8 +1140,7 @@ def create_tikz_from_file(tex_file_path, macros_file_path="macros-drawtree.tex")
         if line and not line.startswith("%"):
             macro_lines.append(line)
 
-
-        tikz_code = """% TikZ code with q.tex styling using TikZ style definitions
+    tikz_code = """% TikZ code with q.tex styling using TikZ style definitions
                     % TikZ libraries required for game trees
                     \\usetikzlibrary{shapes}
                     \\usetikzlibrary{arrows.meta}

@@ -42,3 +42,37 @@ Note, images do not render well in VSCode, so open Jupyter Lab or Jupyter Notebo
     )
     ```
     The `render_as` argument can be 'pdf', 'png', or 'tikz'. The first two will create files `example.pdf` or `example.png` in the current directory. The last will return a string with the TikZ code that you can use in your own LaTeX documents, or view in your Jupyter notebook with.
+
+## Testing
+
+The project includes a comprehensive test suite using pytest. To run the tests:
+
+1. Install test dependencies:
+    ```bash
+    pip install -r test-requirements.txt
+    ```
+
+2. Run all tests:
+    ```bash
+    pytest test_drawtree.py -v
+    ```
+
+3. Run tests with coverage:
+    ```bash
+    pip install pytest-cov
+    pytest test_drawtree.py --cov=drawtree --cov-report=html
+    ```
+
+4. Run specific test classes:
+    ```bash
+    pytest test_drawtree.py::TestUtilityFunctions -v
+    pytest test_drawtree.py::TestTikzGeneration -v
+    ```
+
+The test suite covers:
+- Utility functions (mathematical operations, formatting)
+- String parsing and node operations
+- File I/O operations
+- TikZ code generation
+- Command-line argument processing
+- Player and geometry functions
