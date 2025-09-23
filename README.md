@@ -18,6 +18,8 @@
 
 ## Python API
 
+Note, images do not render well in VSCode, so open Jupyter Lab or Jupyter Notebook to see the images.
+
 1. Create a virtual environment (tested with Python 3.13) e.g.
 
     ```
