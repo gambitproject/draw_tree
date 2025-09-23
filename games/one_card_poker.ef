@@ -1,0 +1,14 @@
+player 1 name Alice
+player 2 name Bob
+level 0 node 1 player 0 
+level 2 node 1 player 1 xshift -3.58 from 0,1 move \frac{1}{2} 
+level 2 node 2 player 1 xshift 3.58 from 0,1 move \frac{1}{2} 
+level 6 node 1 xshift -4.18 from 2,2 move Raise 
+level 4 node 1 xshift 1.79 from 2,2 move Fold payoffs -1 1
+level 8 node 1 xshift -1.19 from 6,1 move Meet payoffs -2 2
+level 8 node 2 xshift 1.19 from 6,1 move Pass payoffs 1 -1
+level 6 node 2 xshift -4.18 from 2,1 move Raise 
+level 4 node 2 xshift 1.79 from 2,1 move Fold payoffs -1 1
+level 8 node 3 xshift -1.19 from 6,2 move Meet payoffs 2 -2
+level 8 node 4 xshift 1.19 from 6,2 move Pass payoffs 1 -1
+iset 6,2 6,1 player 2
