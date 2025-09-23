@@ -813,13 +813,22 @@ def create_tikz_from_file(tex_file_path, macros_file_path="macros-drawtree.tex")
         if line and not line.startswith("%"):
             macro_lines.append(line)
 
-    # Create the complete TikZ code
-    tikz_code = """% Load required TikZ libraries
-                \\usetikzlibrary{shapes}
-                \\usetikzlibrary{arrows.meta}
 
-                % Macro definitions from macros-drawtree.tex
-                """
+        tikz_code = """% TikZ code with q.tex styling using TikZ style definitions
+                    % TikZ libraries required for game trees
+                    \\usetikzlibrary{shapes}
+                    \\usetikzlibrary{arrows.meta}
+
+                    % Style settings to approximate q.tex formatting
+                    \\tikzset{
+                        every node/.append style={font=\\rmfamily},
+                        every text node part/.append style={align=center},
+                        node distance=1.5mm,
+                        thick
+                    }
+
+                    % Macro definitions from macros-drawtree.tex
+                    """
 
     # Add macro definitions
     for macro in macro_lines:
