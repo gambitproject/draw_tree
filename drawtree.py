@@ -778,43 +778,96 @@ def commandline(argv): # process command-line args
             ef_file = arg
     return
 
+def create_tikz_from_file(tex_file_path, macros_file_path="macros-drawtree.tex"):
+    """
+    Create TikZ code by combining macros and game tree content from separate files.
+
+    Args:
+        tex_file_path (str): Path to the .tex file containing the tikzpicture content
+        macros_file_path (str): Path to the macros file (default: "macros-drawtree.tex")
+
+    Returns:
+        str: Complete TikZ code ready for %%tikz magic command
+    """
+
+    # Read the macros file
+    try:
+        with open(macros_file_path, "r") as f:
+            macros_content = f.read()
+    except FileNotFoundError:
+        print(f"Warning: Could not find macros file {macros_file_path}")
+        macros_content = ""
+
+    # Read the tikzpicture content
+    try:
+        with open(tex_file_path, "r") as f:
+            tikz_content = f.read()
+    except FileNotFoundError:
+        print(f"Error: Could not find file {tex_file_path}")
+        return ""
+
+    # Extract macro definitions from the macros file
+    macro_lines = []
+    for line in macros_content.split("\n"):
+        line = line.strip()
+        if line and not line.startswith("%"):
+            macro_lines.append(line)
+
+    # Create the complete TikZ code
+    tikz_code = """% Load required TikZ libraries
+                \\usetikzlibrary{shapes}
+                \\usetikzlibrary{arrows.meta}
+
+                % Macro definitions from macros-drawtree.tex
+                """
+
+    # Add macro definitions
+    for macro in macro_lines:
+        tikz_code += macro + "\n"
+
+    tikz_code += "\n% Game tree content from " + tex_file_path + "\n"
+    tikz_code += tikz_content
+
+    return tikz_code
+
 ######################## main
 
-ef_file = DEFAULTFILE
-commandline(sys.argv)
-outs("% using file: "+ef_file, stream0)
-lines = readfile(ef_file)
+if __name__ == "__main__":
+    ef_file = DEFAULTFILE
+    commandline(sys.argv)
+    outs("% using file: "+ef_file, stream0)
+    lines = readfile(ef_file)
 
-isets = {}
+    isets = {}
 
-# begin tikz picture
-outs("\\begin{tikzpicture}[scale="+str(scale), stream0)
-ss = "  , StealthFill/.tip={Stealth[line width=.7pt"
-outs(ss+",inset=0pt,length=13pt,angle'=30]}]", stream0)
-ss = ""
-if not grid:
-    ss = "% "
-outs(ss+"\\draw [help lines, color=green] (-5,0) grid (5,-6);", stream0)
+    # begin tikz picture
+    outs("\\begin{tikzpicture}[scale="+str(scale), stream0)
+    ss = "  , StealthFill/.tip={Stealth[line width=.7pt"
+    outs(ss+",inset=0pt,length=13pt,angle'=30]}]", stream0)
+    ss = ""
+    if not grid:
+        ss = "% "
+    outs(ss+"\\draw [help lines, color=green] (-5,0) grid (5,-6);", stream0)
 
-# main loop
-for line in lines:
-    comment(line)
-    words = line.split()
-    if words[0] == "player":
-        player(words)
-    elif words[0] == "level":
-        level(words)
-    elif words[0] == "iset":
-        isetgen(words)
+    # main loop
+    for line in lines:
+        comment(line)
+        words = line.split()
+        if words[0] == "player":
+            player(words)
+        elif words[0] == "level":
+            level(words)
+        elif words[0] == "iset":
+            isetgen(words)
 
-# print "---------------"
-# for x in nodes:
-    # print x, nodes[x]
+    # print "---------------"
+    # for x in nodes:
+        # print x, nodes[x]
 
-outall(stream0)
-drawnodes()
-# end tikz picture
-outs("\\end{tikzpicture}")
-outall()
+    outall(stream0)
+    drawnodes()
+    # end tikz picture
+    outs("\\end{tikzpicture}")
+    outall()
 
-quit("done.")
+    quit("done.")
