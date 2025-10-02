@@ -1,173 +1,75 @@
-# DrawTree: Game Tree Visualization Package
+# Steps to run (on MacOS)
 
-A modern Python package for generating beautiful game tree diagrams from extensive form (.ef) files. Creates TikZ-based visualizations that can be rendered as PDF, PNG, or used directly in LaTeX documents and Jupyter notebooks.
+1. Install [MacTEX](https://www.tug.org/mactex/mactex-download.html)
+    - This took ages because it's 5.9 GB...
+    - Is there an easier way to package LaTeX with PyGambit?
+2. Create the tex from the ef file:
 
-## Installation
+    ```
+    python drawtree.py games/example.ef > o.tex
+    ```
+3. Run this command to process the wrapper tex file:
 
-### From PyPI (when published)
-```bash
-pip install drawtree
-```
+    ```
+    pdflatex q.tex
+    ```
+4. Open the resulting PDF file `q.pdf`
 
-### Development Installation
-```bash
-git clone <repository>
-cd draw_tree
-pip install -e .
-```
 
-## Quick Start
+## Python API
 
-### Command Line Interface
+Note, images do not render well in VSCode, so open Jupyter Lab or Jupyter Notebook to see the images.
 
-Generate a PDF directly from an .ef file:
-```bash
-drawtree games/example.ef
-```
+1. Create a virtual environment (tested with Python 3.13) e.g.
 
-Generate TikZ code for use in LaTeX:
-```bash
-drawtree games/example.ef --format tikz
-```
+    ```
+    conda create --name draw_tree python=3.13
+    conda activate draw_tree
+    ```
+2. Install dependencies
 
-Full CLI options:
-```bash
-drawtree --help
-```
+    ```
+    pip install -r requirements.txt
+    ```
+3. In a Python script or Jupyter notebook, run:
 
-### Python API
-
-The modern Python API provides a clean, simple interface:
-
-```python
-import drawtree
-
-# Generate PDF file
-pdf_path = drawtree.draw_tree('games/example.ef', render_as='pdf')
-print(f"PDF created: {pdf_path}")
-
-# Generate TikZ code for Jupyter notebooks
-tikz_code = drawtree.draw_tree('games/example.ef', render_as='tikz')
-print(tikz_code)
-
-# Advanced usage with custom options
-drawtree.draw_tree(
-    game='games/example.ef',
-    name='my_game_tree',
-    render_as='png',
-    output_dir='./output',
-    scale=1.5,
-    grid=True
-)
-```
-
-### Jupyter Notebook Usage
-
-For Jupyter notebooks, you can display TikZ diagrams directly:
-
-```python
-import drawtree
-
-# Generate TikZ code
-tikz_code = drawtree.draw_tree('games/example.ef', render_as='tikz')
-
-# Display in Jupyter (requires %%tikz magic)
-from IPython.display import display, Latex
-display(Latex(tikz_code))
-```
-
-## API Reference
-
-### `draw_tree(game, name=None, render_as='tikz', output_dir=None, scale=1.0, grid=False)`
-
-Main function for generating game tree visualizations.
-
-**Parameters:**
-- `game` (str or Path): Path to the .ef file containing the game definition
-- `name` (str, optional): Base name for output files. Defaults to game filename
-- `render_as` (str): Output format - 'tikz', 'pdf', or 'png'. Default: 'tikz'
-- `output_dir` (str or Path, optional): Directory for output files. Defaults to game file directory  
-- `scale` (float): Scale factor for the diagram. Default: 1.0
-- `grid` (bool): Whether to show grid lines. Default: False
-
-**Returns:**
-- For 'tikz': Returns the TikZ code as a string
-- For 'pdf'/'png': Returns path to created file, or None if creation failed
-
-### `create_tikz_from_file(tex_file_path, macros_file_path=None)`
-
-Utility function to combine TikZ content with macro definitions.
-
-**Parameters:**
-- `tex_file_path` (str): Path to .tex file with tikzpicture content
-- `macros_file_path` (str, optional): Path to macros file. Uses bundled macros if None
-
-**Returns:**
-- Complete TikZ code ready for use
-
-## Dependencies
-
-### Required
-- Python 3.8+
-
-### Optional
-- **pdflatex** (from LaTeX distribution like MacTeX): Required for PDF generation
-- **ImageMagick or poppler-utils**: Required for PNG generation
-
-### Installing LaTeX on macOS
-```bash
-# Install MacTeX (large but complete)
-brew install --cask mactex
-
-# Or install BasicTeX (smaller)
-brew install --cask basictex
-sudo tlmgr update --self
-sudo tlmgr install tikz-qtree
-```
+    ```python
+    from drawtree import draw_tree
+    draw_tree(
+        game='games/example.ef',
+        name='example',
+        render_as='pdf'
+    )
+    ```
+    The `render_as` argument can be 'pdf', 'png', or 'tikz'. The first two will create files `example.pdf` or `example.png` in the current directory. The last will return a string with the TikZ code that you can use in your own LaTeX documents, or view in your Jupyter notebook with.
 
 ## Testing
 
 The project includes a comprehensive test suite using pytest. To run the tests:
 
-```bash
-# Install development dependencies
-pip install -e ".[dev]"
+1. Set up the venv as above
 
-# Run all tests
-pytest -v
+2. Run all tests:
+    ```bash
+    pytest test_drawtree.py -v
+    ```
 
-# Run tests with coverage
-pytest --cov=drawtree --cov-report=html
+3. Run tests with coverage:
+    ```bash
+    pip install pytest-cov
+    pytest test_drawtree.py --cov=drawtree --cov-report=html
+    ```
 
-# Run specific test categories
-pytest test_drawtree.py::TestUtilityFunctions -v
-pytest test_drawtree.py::TestTikzGeneration -v
-```
+4. Run specific test classes:
+    ```bash
+    pytest test_drawtree.py::TestUtilityFunctions -v
+    pytest test_drawtree.py::TestTikzGeneration -v
+    ```
 
 The test suite covers:
 - Utility functions (mathematical operations, formatting)
-- String parsing and node operations  
+- String parsing and node operations
 - File I/O operations
 - TikZ code generation
-- Modern package API
-- Command-line interface
-
-## Development
-
-To set up for development:
-
-```bash
-git clone <repository>
-cd draw_tree
-pip install -e ".[dev]"
-```
-
-The package uses modern Python packaging with:
-- `src/` layout for clean package structure
-- `pyproject.toml` for modern build configuration
-- Entry points for CLI commands
-- Optional dependencies for development and Jupyter
-
-## Legacy Usage
-
-The original `drawtree_original.py` script is still available for backward compatibility, but the new package API is recommended for all new projects.
+- Command-line argument processing
+- Player and geometry functions

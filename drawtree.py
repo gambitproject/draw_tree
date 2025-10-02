@@ -1,13 +1,16 @@
+#!/usr/bin/python
 """
-Core engine for DrawTree package.
+Game tree drawing as TikZ file from .ef file
+Version 1.0.5
 
-This module contains all the original game tree processing logic,
-refactored with proper types and documentation.
+This module provides functionality to generate TikZ code for game trees
+from extensive form (.ef) files, with support for Jupyter notebooks.
 """
 from __future__ import annotations
 
+import sys
 import math
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional 
 
 # Constants
 DEFAULTFILE: str = "example.ef"
@@ -55,10 +58,6 @@ allowcomments: bool = True
 
 outstream: List[str] = []
 stream0: List[str] = []
-
-# Global data structures
-nodes: Dict[str, Any] = {}
-xshifts: Dict[str, float] = {}
 
 
 def outall(stream: Optional[List[str]] = None) -> None:
@@ -146,7 +145,6 @@ def error(s: str, stream: Optional[List[str]] = None) -> None:
     if stream is None:
         stream = outstream
     outs("% ----- Error: " + s, stream)
-
 
 def readfile(filename: str) -> List[str]:
     """
@@ -311,7 +309,6 @@ def det(a: float, b: float, c: float, d: float) -> float:
     """
     return a * d - b * c
 
-
 def isonlineseg(a: List[float], b: List[float], c: List[float]) -> bool:
     """
     Check if point b lies on the line segment [a,c].
@@ -349,7 +346,6 @@ def isonlineseg(a: List[float], b: List[float], c: List[float]) -> bool:
         return (bx <= 0) and (bx >= cx)
     # not collinear
     return False
-
 
 def makearc(a: List[float], b: List[float], c: List[float], radius: float = isetradius) -> str:
     """
@@ -404,12 +400,22 @@ def makearc(a: List[float], b: List[float], c: List[float], radius: float = iset
                 # print "% beta  ", beta
                 assert (alpha<1)
                 assert (beta<1)
+    ## trying to salvage tight angles, other solution is better
+    #           if alpha<0:
+    #               x = ax
+    #               y = ay
+    #           elif beta<0:
+    #               x = cx
+    #               y = cy
+    #           else :
+    #               x = ax + (sx-ax)*alpha
+    #               y = ay + (sy-ay)*alpha
+    #           out = coord(x,y)
                 if alpha >= 0 and beta >= 0 :
                     x = ax + (sx-ax)*alpha
                     y = ay + (sy-ay)*alpha
                     out = coord(x,y)
     return out 
-
 
 def arcseq(nodes: List[List[float]], radius: float = isetradius) -> List[str]:
     """
@@ -458,7 +464,6 @@ def arcseq(nodes: List[List[float]], radius: float = isetradius) -> List[str]:
         out.append(makearc(tour[i-1],tour[i],tour[i+1],radius))
     return out  
 
-
 def iset(nodes: List[List[float]], radius: float = isetradius) -> str:
     """
     Create complete TikZ drawing commands for an information set.
@@ -474,9 +479,9 @@ def iset(nodes: List[List[float]], radius: float = isetradius) -> str:
     # tikz code 
     return "\\draw [" + isetparams + "] " + "\n  -- ".join(arcs) + " -- cycle;"
 
+######################## handling players
 
-# Placeholder functions for remaining functionality
-def player(words: List[str]) -> Tuple[int, int]:
+def player(words: List[str]) -> tuple[int, int]:
     """
     Parse 'player' command and handle player definitions.
     
@@ -518,8 +523,15 @@ def player(words: List[str]) -> Tuple[int, int]:
         playerdefined[p] = True
     return p, advance
 
+######################## handling nodes
 
-def splitnumtext(s: str) -> Tuple[float, str]:
+# each node is itself a dict, with the fields
+# "x", "y", "player", "from", "move", "xshift"
+
+nodes = {}
+xshifts = {}
+
+def splitnumtext(s: str) -> tuple[float, str]:
     """
     Split a string into numeric prefix and text remainder.
     
@@ -554,9 +566,13 @@ def splitnumtext(s: str) -> Tuple[float, str]:
     if tonum and tonum != ".":
         return float(tonum), remainder
     return 1, remainder
+    ## testing:
+    # a = ["2.3abc", ".1b", ".4...f", ".4s1", "22.2xyz)", "a"]
+    # for s in a:
+    #     print s, splitnumtext(s)
+    # quit()
 
-
-def xshift(words: List[str]) -> Tuple[float, float, int]:
+def xshift(words: List[str]) -> tuple[float, float, int]:
     """
     Parse 'xshift' command to determine horizontal positioning.
     
@@ -621,9 +637,17 @@ def xshift(words: List[str]) -> Tuple[float, float, int]:
         else:
             xs = num
     return xs, factor, 2
+    ## testing:
+    # a = ["xshift", "-2"]
+    # b = ["xshift", "-2a=.3"]
+    # c = ["xshift", "3a"]
+    # l = [a,b,c]
+    # for s in l:
+    #     print s, xshift(s)
+    #     print outstream
+    # quit()
 
-
-def fromnode(words: List[str]) -> Tuple[str, int]:
+def fromnode(words: List[str]) -> tuple[str, int]:
     """
     Parse 'from' command to identify parent node.
     
@@ -648,8 +672,7 @@ def fromnode(words: List[str]) -> Tuple[str, int]:
         advance = 2
     return fromn, advance
 
-
-def move(words: List[str]) -> Tuple[str, str, float, int]:
+def move(words: List[str]) -> tuple[str, str, float, int]:
     """
     Parse 'move' command to extract move name and positioning.
     
@@ -686,8 +709,13 @@ def move(words: List[str]) -> Tuple[str, str, float, int]:
     advance = 2
     return mov, movpos, convex, advance
 
+    # # testing
+    # l = ["move:Right", "T"]
+    # print move (l)
+    # outall()
+    # quit ("done testing.")
 
-def arrow(words: List[str]) -> Tuple[float, str, int]:
+def arrow(words: List[str]) -> tuple[float, str, int]:
     """
     Parse 'arrow' command to extract arrow positioning and color.
     
@@ -715,7 +743,6 @@ def arrow(words: List[str]) -> Tuple[float, str, int]:
         error("Arrow position in [0,1] required, using 0.5")
     return arrowpos, arrowcolor, advance
 
-
 def payoffs(words: List[str]) -> List[str]:
     """
     Parse 'payoffs' command to generate TikZ payoff display code.
@@ -742,7 +769,13 @@ def payoffs(words: List[str]) -> List[str]:
         t += "$\\strut}"
         paylist.append(t)
     return paylist
-
+    # # testing
+    # s = "payoffs -2 3 4 5"
+    # s = "payoffs 0 x 1 3 4 5"
+    # a = payoffs(s.split())
+    # for s in a:
+    #     print s
+    # quit()
 
 def drawnode(v: List[float], player: int = 1) -> str:
     """
@@ -768,7 +801,6 @@ def drawnode(v: List[float], player: int = 1) -> str:
     outs(out)
     return out
 
-
 def drawnodes() -> None:
     """
     Draw all inner (non-leaf) nodes in the game tree.
@@ -783,7 +815,6 @@ def drawnodes() -> None:
             drawnode(v, p)
     return
 
-
 def setnodeid(lev: float, s: str) -> str:
     """
     Create node identifier from level and name.
@@ -796,7 +827,6 @@ def setnodeid(lev: float, s: str) -> str:
         Formatted node identifier string "level,name".
     """
     return fformat(lev)+","+s
-
 
 def cleannodeid(ns: str) -> str:
     """
@@ -820,7 +850,22 @@ def cleannodeid(ns: str) -> str:
         error("Level must be a number, using 0")
         lev = 0
     return setnodeid(lev, s)
+    # # testing
+    # s = "1,2 3,4 .0,r x,7 88 ,"
+    # a = s.split()
+    # a.append("")
+    # for s in a:
+    #     print s, cleannodeid(s)
+    #     print outstream
+    # quit()
 
+# handle "level" keyword;
+# commands: "node" node , then in any order
+# "xshift" [-][2][[a=]1.5|a]  (2= multiple, a= xshift name, 1.5 = dimen)
+# "from" nodeid (nodeid = level,node)
+# "move" movename
+# "payoffs" list of payoffs, comes last
+# "inner" boolean: inner node, draw disk/square
 
 def level(words: List[str]) -> None:
     """
@@ -964,6 +1009,7 @@ def level(words: List[str]) -> None:
         outs("   ;")
     return
 
+######################## isets
 
 def isetgen(words: List[str]) -> None:
     """
@@ -1027,27 +1073,53 @@ def isetgen(words: List[str]) -> None:
             outs(s)
     return
 
+########### command-line arguments
 
-def commandline() -> None:
-    """Handle command line processing."""
-    # This function is now handled by the CLI module
-    pass
+def commandline(argv: List[str]) -> None:
+    """
+    Process command-line arguments to set global configuration.
+    
+    Sets global variables for ef_file, scale, and grid based on
+    command-line arguments.
+    
+    Args:
+        argv: List of command-line arguments (including script name).
+    """
+    global grid
+    global scale 
+    global ef_file
+    for arg in argv[1:]:
+        if arg[:5] == "scale":
+            a = arg.split("=")
+            try:    
+                num = float(a[1])
+                if num >= 0.01 and num <= 100:
+                    scale = num
+                else: 
+                    outs("% Command-line argument 'scale=x' needs x in 0.01 .. 100", stream0)
+            except Exception:
+                outs("% Command-line argument 'scale=x' needs x in 0.01 .. 100", stream0)
+        elif arg == "grid":
+            grid = True
+        else:
+            ef_file = arg
+    return
 
-
-def create_tikz_from_file(tex_file_path: str, macros_file_path: str) -> str:
+def create_tikz_from_file(tex_file_path, macros_file_path="macros-drawtree.tex"):
     """
     Create TikZ code by combining macros and game tree content from separate files.
 
     Args:
-        tex_file_path: Path to the .tex file containing the tikzpicture content
-        macros_file_path: Path to the macros file
+        tex_file_path (str): Path to the .tex file containing the tikzpicture content
+        macros_file_path (str): Path to the macros file (default: "macros-drawtree.tex")
 
     Returns:
-        Complete TikZ code as a string, ready for use in Jupyter notebooks or LaTeX documents.
+        str: Complete TikZ code ready for %%tikz magic command
     """
+
     # Read the macros file
     try:
-        with open(macros_file_path, 'r') as f:
+        with open(macros_file_path, "r") as f:
             macros_content = f.read()
     except FileNotFoundError:
         print(f"Warning: Could not find macros file {macros_file_path}")
@@ -1055,7 +1127,7 @@ def create_tikz_from_file(tex_file_path: str, macros_file_path: str) -> str:
 
     # Read the tikzpicture content
     try:
-        with open(tex_file_path, 'r') as f:
+        with open(tex_file_path, "r") as f:
             tikz_content = f.read()
     except FileNotFoundError:
         print(f"Error: Could not find file {tex_file_path}")
@@ -1069,20 +1141,20 @@ def create_tikz_from_file(tex_file_path: str, macros_file_path: str) -> str:
             macro_lines.append(line)
 
     tikz_code = """% TikZ code with q.tex styling using TikZ style definitions
-% TikZ libraries required for game trees
-\\usetikzlibrary{shapes}
-\\usetikzlibrary{arrows.meta}
+                    % TikZ libraries required for game trees
+                    \\usetikzlibrary{shapes}
+                    \\usetikzlibrary{arrows.meta}
 
-% Style settings to approximate q.tex formatting
-\\tikzset{
-    every node/.append style={font=\\rmfamily},
-    every text node part/.append style={align=center},
-    node distance=1.5mm,
-    thick
-}
+                    % Style settings to approximate q.tex formatting
+                    \\tikzset{
+                        every node/.append style={font=\\rmfamily},
+                        every text node part/.append style={align=center},
+                        node distance=1.5mm,
+                        thick
+                    }
 
-% Macro definitions from macros-drawtree.tex
-"""
+                    % Macro definitions from macros-drawtree.tex
+                    """
 
     # Add macro definitions
     for macro in macro_lines:
@@ -1092,3 +1164,45 @@ def create_tikz_from_file(tex_file_path: str, macros_file_path: str) -> str:
     tikz_code += tikz_content
 
     return tikz_code
+
+######################## main
+
+if __name__ == "__main__":
+    ef_file = DEFAULTFILE
+    commandline(sys.argv)
+    outs("% using file: "+ef_file, stream0)
+    lines = readfile(ef_file)
+
+    isets = {}
+
+    # begin tikz picture
+    outs("\\begin{tikzpicture}[scale="+str(scale), stream0)
+    ss = "  , StealthFill/.tip={Stealth[line width=.7pt"
+    outs(ss+",inset=0pt,length=13pt,angle'=30]}]", stream0)
+    ss = ""
+    if not grid:
+        ss = "% "
+    outs(ss+"\\draw [help lines, color=green] (-5,0) grid (5,-6);", stream0)
+
+    # main loop
+    for line in lines:
+        comment(line)
+        words = line.split()
+        if words[0] == "player":
+            player(words)
+        elif words[0] == "level":
+            level(words)
+        elif words[0] == "iset":
+            isetgen(words)
+
+    # print "---------------"
+    # for x in nodes:
+        # print x, nodes[x]
+
+    outall(stream0)
+    drawnodes()
+    # end tikz picture
+    outs("\\end{tikzpicture}")
+    outall()
+
+    quit("done.")
