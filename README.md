@@ -1,4 +1,9 @@
-# Steps to run (on MacOS)
+# draw_tree
+
+🚧 `draw_tree` is a work in progress and not currently usable. 🚧
+
+
+## Steps to run (on MacOS)
 
 1. Install [MacTEX](https://www.tug.org/mactex/mactex-download.html)
     - This took ages because it's 5.9 GB...
@@ -31,7 +36,7 @@ Note, images do not render well in VSCode, so open Jupyter Lab or Jupyter Notebo
     ```
     pip install -r requirements.txt
     ```
-3. In a Python script or Jupyter notebook, run:
+3. [WIP expected API] In a Python script or Jupyter notebook, run:
 
     ```python
     from drawtree import draw_tree
