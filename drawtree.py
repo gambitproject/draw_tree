@@ -1257,37 +1257,27 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False, 
 ######################## main
 
 if __name__ == "__main__":
+    # Initialize default file and process command-line arguments
     ef_file = DEFAULTFILE
-    commandline(sys.argv)
-    outs("% using file: "+ef_file, stream0)
-    lines = readfile(ef_file)
+    commandline(sys.argv)  # Sets global variables: ef_file, scale, grid
+    
+    # Generate complete TikZ code
+    try:
+        tikz_code = draw_tree(
+            ef_file=ef_file, 
+            scale_factor=scale, 
+            show_grid=grid,
+            macros_file_path="macros-drawtree.tex"
+        )
+        
+        # Output the complete TikZ code
+        print(tikz_code)
+        
+    except FileNotFoundError:
+        print(f"Error: Could not find file {ef_file}")
+        print("Make sure the .ef file exists in the current directory")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error processing {ef_file}: {e}")
+        sys.exit(1)
 
-    isets = {}
-
-    # begin tikz picture
-    outs("\\begin{tikzpicture}[scale="+str(scale), stream0)
-    ss = "  , StealthFill/.tip={Stealth[line width=.7pt"
-    outs(ss+",inset=0pt,length=13pt,angle'=30]}]", stream0)
-    ss = ""
-    if not grid:
-        ss = "% "
-    outs(ss+"\\draw [help lines, color=green] (-5,0) grid (5,-6);", stream0)
-
-    # main loop
-    for line in lines:
-        comment(line)
-        words = line.split()
-        if words[0] == "player":
-            player(words)
-        elif words[0] == "level":
-            level(words)
-        elif words[0] == "iset":
-            isetgen(words)
-
-    outall(stream0)
-    drawnodes()
-    # end tikz picture
-    outs("\\end{tikzpicture}")
-    outall()
-
-    quit("done.")
