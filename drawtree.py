@@ -9,6 +9,7 @@ from extensive form (.ef) files, with support for Jupyter notebooks.
 from __future__ import annotations
 
 import sys
+import os
 import math
 import subprocess
 import tempfile
@@ -1079,28 +1080,32 @@ def isetgen(words: List[str]) -> None:
 
 ########### command-line arguments
 
-def commandline(argv: List[str]) -> tuple[str, bool, Optional[str]]:
+def commandline(argv: List[str]) -> tuple[str, bool, bool, Optional[str], Optional[int]]:
     """
     Process command-line arguments to set global configuration.
     
     Sets global variables for ef_file, scale, and grid based on
-    command-line arguments. Also detects if PDF output is requested.
+    command-line arguments. Also detects if PDF or PNG output is requested.
     
     Args:
         argv: List of command-line arguments (including script name).
         
     Returns:
-        Tuple of (output_mode, pdf_requested, output_pdf) where:
-        - output_mode: 'tikz' for TikZ output, 'pdf' for PDF output
+        Tuple of (output_mode, pdf_requested, png_requested, output_file, dpi) where:
+        - output_mode: 'tikz', 'pdf', or 'png'
         - pdf_requested: True if --pdf flag was provided
-        - output_pdf: Custom output PDF filename if specified
+        - png_requested: True if --png flag was provided
+        - output_file: Custom output filename if specified
+        - dpi: DPI setting for PNG output (None if not specified)
     """
     global grid
     global scale 
     global ef_file
     
     pdf_requested = False
-    output_pdf = None
+    png_requested = False
+    output_file = None
+    dpi = None
     
     for arg in argv[1:]:
         if arg[:5] == "scale":
@@ -1117,16 +1122,38 @@ def commandline(argv: List[str]) -> tuple[str, bool, Optional[str]]:
             grid = True
         elif arg == "--pdf":
             pdf_requested = True
+        elif arg == "--png":
+            png_requested = True
         elif arg.startswith("--output="):
-            output_pdf = arg[9:]  # Remove "--output=" prefix
-            pdf_requested = True
+            output_file = arg[9:]  # Remove "--output=" prefix
+            if output_file.endswith('.pdf'):
+                pdf_requested = True
+            elif output_file.endswith('.png'):
+                png_requested = True
+        elif arg.startswith("--dpi="):
+            try:
+                dpi = int(arg[6:])  # Remove "--dpi=" prefix
+                if dpi < 72 or dpi > 2400:
+                    print("Warning: DPI should be between 72 and 2400, using default 300", file=sys.stderr)
+                    dpi = 300
+            except ValueError:
+                print("Warning: Invalid DPI value, using default 300", file=sys.stderr)
+                dpi = 300
         elif arg.endswith('.ef'):
             ef_file = arg
         else:
             # For backward compatibility, treat unknown args as filenames
             ef_file = arg
     
-    return ("pdf" if pdf_requested else "tikz", pdf_requested, output_pdf)
+    # Determine output mode
+    if png_requested:
+        output_mode = "png"
+    elif pdf_requested:
+        output_mode = "pdf"
+    else:
+        output_mode = "tikz"
+    
+    return (output_mode, pdf_requested, png_requested, output_file, dpi)
 
 def ef_to_tex(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
     """
@@ -1372,13 +1399,140 @@ def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: f
             raise RuntimeError("pdflatex not found. Please install a LaTeX distribution (e.g., TeX Live, MiKTeX).")
 
 
+def generate_png(ef_file: str, output_png: Optional[str] = None, scale_factor: float = 1.0, 
+                show_grid: bool = False, dpi: int = 300, cleanup: bool = True) -> str:
+    """
+    Generate a PNG image directly from an extensive form (.ef) file.
+    
+    This function creates a PDF first, then converts it to PNG using external tools.
+    Requires both pdflatex and either ImageMagick (convert) or Ghostscript (gs).
+    
+    Args:
+        ef_file: Path to the .ef file to process.
+        output_png: Output PNG filename. If None, derives from ef_file name.
+        scale_factor: Scale factor for the diagram (default: 1.0).
+        show_grid: Whether to show grid lines (default: False).
+        dpi: Resolution in dots per inch (default: 300).
+        cleanup: Whether to remove temporary files (default: True).
+        
+    Returns:
+        Path to the generated PNG file.
+        
+    Raises:
+        FileNotFoundError: If the .ef file doesn't exist.
+        RuntimeError: If PDF generation or PNG conversion fails.
+    """
+    # Determine output filename
+    if output_png is None:
+        ef_path = Path(ef_file)
+        output_png = ef_path.with_suffix('.png').name
+    
+    # Step 1: Generate PDF first
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_pdf = Path(temp_dir) / "temp_output.pdf"
+        
+        try:
+            # Generate PDF using existing function
+            generate_pdf(
+                ef_file=ef_file,
+                output_pdf=str(temp_pdf),
+                scale_factor=scale_factor,
+                show_grid=show_grid,
+                cleanup=cleanup
+            )
+            
+            # Step 2: Convert PDF to PNG
+            final_png_path = Path(output_png)
+            
+            # Try different conversion methods in order of preference
+            conversion_success = False
+            
+            # Method 1: Try ImageMagick convert
+            try:
+                subprocess.run([
+                    'convert',
+                    '-density', str(dpi),
+                    '-quality', '100',
+                    str(temp_pdf),
+                    str(final_png_path)
+                ], capture_output=True, text=True, check=True)
+                conversion_success = True
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass
+            
+            # Method 2: Try Ghostscript if ImageMagick failed
+            if not conversion_success:
+                try:
+                    subprocess.run([
+                        'gs',
+                        '-dNOPAUSE',
+                        '-dBATCH',
+                        '-sDEVICE=png16m',
+                        f'-r{dpi}',
+                        f'-sOutputFile={final_png_path}',
+                        str(temp_pdf)
+                    ], capture_output=True, text=True, check=True)
+                    conversion_success = True
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    pass
+            
+            # Method 3: Try pdftoppm + convert if available
+            if not conversion_success:
+                try:
+                    temp_ppm = Path(temp_dir) / "temp_output"
+                    # Convert PDF to PPM first
+                    subprocess.run([
+                        'pdftoppm',
+                        '-r', str(dpi),
+                        str(temp_pdf),
+                        str(temp_ppm)
+                    ], capture_output=True, text=True, check=True)
+                    
+                    # Find the generated PPM file (pdftoppm adds -1.ppm suffix)
+                    ppm_file = Path(temp_dir) / f"{temp_ppm.name}-1.ppm"
+                    if ppm_file.exists():
+                        # Convert PPM to PNG
+                        subprocess.run([
+                            'convert',
+                            str(ppm_file),
+                            str(final_png_path)
+                        ], capture_output=True, text=True, check=True)
+                        conversion_success = True
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    pass
+            
+            if not conversion_success:
+                raise RuntimeError(
+                    "PNG conversion failed. Please install one of the following:\n"
+                    "  - ImageMagick (provides 'convert' command)\n"
+                    "  - Ghostscript (provides 'gs' command)\n"
+                    "  - Poppler utils (provides 'pdftoppm' command)\n\n"
+                    "Installation examples:\n"
+                    "  macOS: brew install imagemagick ghostscript poppler\n"
+                    "  Ubuntu: sudo apt-get install imagemagick ghostscript poppler-utils\n"
+                    "  Windows: Install ImageMagick or Ghostscript from their websites"
+                )
+            
+            if final_png_path.exists():
+                return str(final_png_path.absolute())
+            else:
+                raise RuntimeError("PNG was not generated successfully")
+                
+        except FileNotFoundError:
+            # Re-raise file not found errors directly
+            raise
+        except RuntimeError:
+            # Re-raise PDF generation errors
+            raise
+        except Exception as e:
+            raise RuntimeError(f"PNG generation failed: {e}")
 ######################## main
 
 if __name__ == "__main__":
-    # === STREAMLINED MAIN EXECUTION USING draw_tree() OR generate_pdf() ===
+    # === STREAMLINED MAIN EXECUTION USING draw_tree(), generate_pdf(), OR generate_png() ===
     # Initialize default file and process command-line arguments
     ef_file = DEFAULTFILE
-    output_mode, pdf_requested, output_pdf = commandline(sys.argv)
+    output_mode, pdf_requested, png_requested, output_file, dpi = commandline(sys.argv)
     
     # Display help if no arguments provided
     if len(sys.argv) == 1:
@@ -1387,31 +1541,52 @@ if __name__ == "__main__":
         print("Usage:")
         print("  python drawtree.py <file.ef> [options]           # Generate TikZ code")
         print("  python drawtree.py <file.ef> --pdf [options]     # Generate PDF (requires pdflatex)")
-        print("  python drawtree.py <file.ef> --output=name.pdf   # Generate PDF with custom name")
+        print("  python drawtree.py <file.ef> --png [options]     # Generate PNG (requires pdflatex + imagemagick/ghostscript)")
+        print("  python drawtree.py <file.ef> --output=name.ext   # Generate with custom filename (.pdf or .png)")
         print()
         print("Options:")
         print("  scale=X.X    Set scale factor (0.01 to 100)")
         print("  grid         Show helper grid")
         print("  --pdf        Generate PDF output instead of TikZ")
-        print("  --output=X   Specify output PDF filename")
+        print("  --png        Generate PNG output instead of TikZ")
+        print("  --output=X   Specify output filename (.pdf or .png extension determines format)")
+        print("  --dpi=X      Set PNG resolution in DPI (72-2400, default: 300)")
         print()
         print("Examples:")
+        print("  # New single-step generation:")
         print("  python drawtree.py games/example.ef --pdf")
-        print("  python drawtree.py games/example.ef --output=mygame.pdf scale=0.8")
+        print("  python drawtree.py games/example.ef --png --dpi=600")
+        print("  python drawtree.py games/example.ef --output=mygame.png scale=0.8")
         print()
-        print("Note: PDF generation requires pdflatex to be installed and available in PATH.")
+        print("Note: PDF/PNG generation requires pdflatex. PNG also needs ImageMagick or Ghostscript.")
         sys.exit(0)
     
     try:
-        if pdf_requested:
-            # Generate PDF directly
+        if output_mode == "pdf":
+            print(f"Generating PDF: {output_file}")
             pdf_path = generate_pdf(
                 ef_file=ef_file,
-                output_pdf=output_pdf,
+                output_pdf=output_file,
                 scale_factor=scale,
                 show_grid=grid
             )
             print(f"PDF generated successfully: {pdf_path}")
+        
+        elif output_mode == "png":
+            # Use default PNG filename if none specified
+            if output_file is None:
+                base_name = os.path.splitext(os.path.basename(ef_file))[0]
+                output_file = f"{base_name}.png"
+            print(f"Generating PNG: {output_file}")
+            png_path = generate_png(
+                ef_file=ef_file,
+                output_png=output_file,
+                scale_factor=scale,
+                show_grid=grid,
+                dpi=dpi if dpi is not None else 300
+            )
+            print(f"PNG generated successfully: {png_path}")
+        
         else:
             # Generate TikZ code (original behavior)
             tikz_code = draw_tree(

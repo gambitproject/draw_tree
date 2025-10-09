@@ -336,5 +336,143 @@ class TestDrawTreeFunction:
             os.unlink(ef_file_path)
 
 
+class TestPngGeneration:
+    """Test PNG generation functionality."""
+
+    def test_generate_png_missing_file(self):
+        """Test PNG generation with missing .ef file."""
+        with pytest.raises(FileNotFoundError):
+            drawtree.generate_png("nonexistent.ef")
+
+    @patch('drawtree.subprocess.run')
+    def test_generate_png_pdflatex_not_found(self, mock_run):
+        """Test PNG generation when pdflatex is not available."""
+        # Mock pdflatex not being found
+        mock_run.side_effect = FileNotFoundError("pdflatex not found")
+        
+        # Create a temporary .ef file
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
+            ef_file.write("player 1\nlevel 0 node root player 1\n")
+            ef_file_path = ef_file.name
+
+        try:
+            with pytest.raises(RuntimeError, match="pdflatex not found"):
+                drawtree.generate_png(ef_file_path)
+        finally:
+            os.unlink(ef_file_path)
+
+    def test_generate_png_default_parameters(self):
+        """Test PNG generation with default parameters."""
+        # Create a temporary .ef file
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
+            ef_file.write("player 1\nlevel 0 node root player 1\n")
+            ef_file_path = ef_file.name
+
+        try:
+            # Mock both pdflatex and convert being unavailable to test error handling
+            with patch('drawtree.subprocess.run') as mock_run:
+                mock_run.side_effect = FileNotFoundError("Command not found")
+                
+                with pytest.raises(RuntimeError):
+                    drawtree.generate_png(ef_file_path)
+        finally:
+            os.unlink(ef_file_path)
+
+    def test_generate_png_custom_dpi(self):
+        """Test PNG generation with custom DPI setting."""
+        # Create a temporary .ef file
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
+            ef_file.write("player 1\nlevel 0 node root player 1\n")
+            ef_file_path = ef_file.name
+
+        try:
+            # Test that custom DPI is handled properly
+            with patch('drawtree.subprocess.run') as mock_run:
+                mock_run.side_effect = FileNotFoundError("Command not found")
+                
+                with pytest.raises(RuntimeError):
+                    drawtree.generate_png(ef_file_path, dpi=600)
+        finally:
+            os.unlink(ef_file_path)
+
+    def test_generate_png_output_filename(self):
+        """Test PNG generation with custom output filename."""
+        # Create a temporary .ef file
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
+            ef_file.write("player 1\nlevel 0 node root player 1\n")
+            ef_file_path = ef_file.name
+
+        try:
+            with patch('drawtree.subprocess.run') as mock_run:
+                mock_run.side_effect = FileNotFoundError("Command not found")
+                
+                with pytest.raises(RuntimeError):
+                    drawtree.generate_png(ef_file_path, output_png="custom_name.png")
+        finally:
+            os.unlink(ef_file_path)
+
+
+class TestCommandlineArguments:
+    """Test command line argument parsing for new PNG functionality."""
+
+    def test_commandline_png_flag(self):
+        """Test --png flag parsing."""
+        result = drawtree.commandline(['drawtree.py', 'test.ef', '--png'])
+        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        assert output_mode == "png"
+        assert not pdf_requested
+        assert png_requested
+        assert output_file is None
+        assert dpi is None
+
+    def test_commandline_png_with_dpi(self):
+        """Test --png flag with --dpi option."""
+        result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=600'])
+        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        assert output_mode == "png"
+        assert not pdf_requested
+        assert png_requested
+        assert output_file is None
+        assert dpi == 600
+
+    def test_commandline_png_output_file(self):
+        """Test PNG output with custom filename."""
+        result = drawtree.commandline(['drawtree.py', 'test.ef', '--output=custom.png'])
+        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        assert output_mode == "png"
+        assert not pdf_requested
+        assert png_requested
+        assert output_file == "custom.png"
+        assert dpi is None
+
+    def test_commandline_pdf_output_file(self):
+        """Test PDF output with custom filename."""
+        result = drawtree.commandline(['drawtree.py', 'test.ef', '--output=custom.pdf'])
+        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        assert output_mode == "pdf"
+        assert pdf_requested
+        assert not png_requested
+        assert output_file == "custom.pdf"
+        assert dpi is None
+
+    def test_commandline_invalid_dpi(self):
+        """Test invalid DPI values."""
+        # Too low DPI should default to 300
+        result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=50'])
+        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        assert dpi == 300  # Should default to 300 for out-of-range values
+
+        # Too high DPI should default to 300
+        result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=5000'])
+        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        assert dpi == 300  # Should default to 300 for out-of-range values
+
+    def test_commandline_invalid_dpi_string(self):
+        """Test non-numeric DPI values."""
+        result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=high'])
+        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        assert dpi == 300  # Should default to 300 for invalid values
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
