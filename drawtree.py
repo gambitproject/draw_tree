@@ -1284,10 +1284,6 @@ if __name__ == "__main__":
         elif words[0] == "iset":
             isetgen(words)
 
-    # print "---------------"
-    # for x in nodes:
-        # print x, nodes[x]
-
     outall(stream0)
     drawnodes()
     # end tikz picture
