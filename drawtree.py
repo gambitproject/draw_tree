@@ -1220,9 +1220,6 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False, 
     """
     Generate complete TikZ code from an extensive form (.ef) file.
     
-    This function combines ef_to_tex and create_tikz_from_file into a single
-    streamlined call that goes directly from .ef file to complete TikZ code.
-    
     Args:
         ef_file: Path to the .ef file to process.
         scale_factor: Scale factor for the diagram (default: 1.0).
@@ -1273,71 +1270,6 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False, 
 
     tikz_code += f"\n% Game tree content from {ef_file}\n"
     tikz_code += tikz_picture_content
-
-    return tikz_code
-
-
-def create_tikz_from_file(tex_file: str, macros_file: str = "macros-drawtree.tex") -> str:
-    """
-    Create complete TikZ code by combining a .tex file with macros.
-    
-    This function is maintained for backward compatibility with the original workflow.
-    
-    Args:
-        tex_file: Path to the .tex file containing TikZ picture content.
-        macros_file: Path to the macros file (default: "macros-drawtree.tex").
-        
-    Returns:
-        Complete TikZ code ready for use.
-        
-    Note:
-        This function is deprecated. Use draw_tree() instead for direct .ef processing.
-    """
-    # Read the TikZ content from the .tex file
-    try:
-        with open(tex_file, "r") as f:
-            tikz_content = f.read()
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Could not find TikZ file: {tex_file}")
-    
-    # Read and process the macros file
-    try:
-        with open(macros_file, "r") as f:
-            macros_content = f.read()
-    except FileNotFoundError:
-        print(f"Warning: Could not find macros file {macros_file}")
-        macros_content = ""
-
-    # Extract macro definitions from the macros file
-    macro_lines = []
-    for line in macros_content.split("\n"):
-        line = line.strip()
-        if line and not line.startswith("%"):
-            macro_lines.append(line)
-
-    # Combine everything into complete TikZ code
-    tikz_code = """% TikZ code with q.tex styling using TikZ style definitions
-% TikZ libraries required for game trees
-\\usetikzlibrary{shapes}
-\\usetikzlibrary{arrows.meta}
-
-% Style settings to approximate q.tex formatting
-\\tikzset{
-    every node/.append style={font=\\rmfamily},
-    every text node part/.append style={align=center},
-    node distance=1.5mm,
-    thick
-}
-
-% Macro definitions from macros-drawtree.tex
-"""
-
-    # Add macro definitions
-    for macro in macro_lines:
-        tikz_code += macro + "\n"
-
-    tikz_code += f"\n% Game tree content from {tex_file}\n"
-    tikz_code += tikz_content
 
     return tikz_code
 
