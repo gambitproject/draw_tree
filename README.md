@@ -8,17 +8,13 @@
 1. Install [MacTEX](https://www.tug.org/mactex/mactex-download.html)
     - This took ages because it's 5.9 GB...
     - Is there an easier way to package LaTeX with PyGambit?
-2. Create the tex from the ef file:
+2. Use CLI: Create the pdf from the ef file:
 
     ```
-    python drawtree.py games/example.ef > o.tex
+    python drawtree.py games/example.ef --pdf                    # Creates example.pdf
+    python drawtree.py games/example.ef --output=custom.pdf      # Creates custom.pdf
     ```
-3. Run this command to process the wrapper tex file:
-
-    ```
-    pdflatex q.tex
-    ```
-4. Open the resulting PDF file `q.pdf`
+3. Open the resulting PDF file
 
 
 ## Python API

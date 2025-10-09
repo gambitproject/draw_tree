@@ -10,6 +10,10 @@ from __future__ import annotations
 
 import sys
 import math
+import subprocess
+import tempfile
+
+from pathlib import Path
 from typing import List, Optional 
 
 # Constants
@@ -1075,19 +1079,29 @@ def isetgen(words: List[str]) -> None:
 
 ########### command-line arguments
 
-def commandline(argv: List[str]) -> None:
+def commandline(argv: List[str]) -> tuple[str, bool, Optional[str]]:
     """
     Process command-line arguments to set global configuration.
     
     Sets global variables for ef_file, scale, and grid based on
-    command-line arguments.
+    command-line arguments. Also detects if PDF output is requested.
     
     Args:
         argv: List of command-line arguments (including script name).
+        
+    Returns:
+        Tuple of (output_mode, pdf_requested, output_pdf) where:
+        - output_mode: 'tikz' for TikZ output, 'pdf' for PDF output
+        - pdf_requested: True if --pdf flag was provided
+        - output_pdf: Custom output PDF filename if specified
     """
     global grid
     global scale 
     global ef_file
+    
+    pdf_requested = False
+    output_pdf = None
+    
     for arg in argv[1:]:
         if arg[:5] == "scale":
             a = arg.split("=")
@@ -1101,9 +1115,18 @@ def commandline(argv: List[str]) -> None:
                 outs("% Command-line argument 'scale=x' needs x in 0.01 .. 100", stream0)
         elif arg == "grid":
             grid = True
-        else:
+        elif arg == "--pdf":
+            pdf_requested = True
+        elif arg.startswith("--output="):
+            output_pdf = arg[9:]  # Remove "--output=" prefix
+            pdf_requested = True
+        elif arg.endswith('.ef'):
             ef_file = arg
-    return
+        else:
+            # For backward compatibility, treat unknown args as filenames
+            ef_file = arg
+    
+    return ("pdf" if pdf_requested else "tikz", pdf_requested, output_pdf)
 
 def ef_to_tex(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
     """
@@ -1254,30 +1277,232 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False, 
     return tikz_code
 
 
+def create_tikz_from_file(tex_file: str, macros_file: str = "macros-drawtree.tex") -> str:
+    """
+    Create complete TikZ code by combining a .tex file with macros.
+    
+    This function is maintained for backward compatibility with the original workflow.
+    
+    Args:
+        tex_file: Path to the .tex file containing TikZ picture content.
+        macros_file: Path to the macros file (default: "macros-drawtree.tex").
+        
+    Returns:
+        Complete TikZ code ready for use.
+        
+    Note:
+        This function is deprecated. Use draw_tree() instead for direct .ef processing.
+    """
+    # Read the TikZ content from the .tex file
+    try:
+        with open(tex_file, "r") as f:
+            tikz_content = f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Could not find TikZ file: {tex_file}")
+    
+    # Read and process the macros file
+    try:
+        with open(macros_file, "r") as f:
+            macros_content = f.read()
+    except FileNotFoundError:
+        print(f"Warning: Could not find macros file {macros_file}")
+        macros_content = ""
+
+    # Extract macro definitions from the macros file
+    macro_lines = []
+    for line in macros_content.split("\n"):
+        line = line.strip()
+        if line and not line.startswith("%"):
+            macro_lines.append(line)
+
+    # Combine everything into complete TikZ code
+    tikz_code = """% TikZ code with q.tex styling using TikZ style definitions
+% TikZ libraries required for game trees
+\\usetikzlibrary{shapes}
+\\usetikzlibrary{arrows.meta}
+
+% Style settings to approximate q.tex formatting
+\\tikzset{
+    every node/.append style={font=\\rmfamily},
+    every text node part/.append style={align=center},
+    node distance=1.5mm,
+    thick
+}
+
+% Macro definitions from macros-drawtree.tex
+"""
+
+    # Add macro definitions
+    for macro in macro_lines:
+        tikz_code += macro + "\n"
+
+    tikz_code += f"\n% Game tree content from {tex_file}\n"
+    tikz_code += tikz_content
+
+    return tikz_code
+
+
+def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: float = 1.0, show_grid: bool = False, cleanup: bool = True) -> str:
+    """
+    Generate a PDF directly from an extensive form (.ef) file.
+    
+    This function creates a complete LaTeX document, compiles it to PDF,
+    and optionally cleans up temporary files.
+    
+    Args:
+        ef_file: Path to the .ef file to process.
+        output_pdf: Output PDF filename. If None, derives from ef_file name.
+        scale_factor: Scale factor for the diagram (default: 1.0).
+        show_grid: Whether to show grid lines (default: False).
+        cleanup: Whether to remove temporary files (default: True).
+        
+    Returns:
+        Path to the generated PDF file.
+        
+    Raises:
+        FileNotFoundError: If the .ef file doesn't exist.
+        subprocess.CalledProcessError: If LaTeX compilation fails.
+    """
+    # Determine output filename
+    if output_pdf is None:
+        ef_path = Path(ef_file)
+        output_pdf = ef_path.with_suffix('.pdf').name
+    
+    # Generate TikZ content using draw_tree
+    tikz_content = draw_tree(ef_file, scale_factor, show_grid)
+    
+    # Create LaTeX wrapper document (based on q.tex)
+    latex_document = f"""% Auto-generated wrapper for game tree drawing from {ef_file}
+\\documentclass[a4paper,12pt]{{article}}
+\\usepackage{{newpxtext,newpxmath}}
+\\linespread{{1.10}}        % Palatino needs more leading (space between lines) 
+\\usepackage{{graphicx}}
+\\usepackage{{tikz}}
+\\usetikzlibrary{{shapes}}
+\\usetikzlibrary{{arrows.meta}}
+\\oddsidemargin=.46cm 
+\\textwidth=15cm
+\\textheight=24cm
+\\topmargin=-1.3cm
+\\parindent 0pt
+\\parskip1ex
+\\pagestyle{{empty}}
+
+\\begin{{document}}
+
+\\hrule
+
+{tikz_content}
+
+\\hrule
+
+\\end{{document}}
+"""
+    
+    # Use temporary directory for LaTeX compilation
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        
+        # Write LaTeX file
+        tex_file = temp_path / "output.tex"
+        with open(tex_file, 'w', encoding='utf-8') as f:
+            f.write(latex_document)
+        
+        # Compile with pdflatex
+        try:
+            subprocess.run([
+                'pdflatex', 
+                '-interaction=nonstopmode',
+                '-output-directory', str(temp_path),
+                str(tex_file)
+            ], capture_output=True, text=True, check=True)
+            
+            # Move the generated PDF to the desired location
+            generated_pdf = temp_path / "output.pdf"
+            final_pdf_path = Path(output_pdf)
+            
+            if generated_pdf.exists():
+                # Copy to final destination
+                import shutil
+                shutil.copy2(generated_pdf, final_pdf_path)
+                return str(final_pdf_path.absolute())
+            else:
+                raise RuntimeError("PDF was not generated successfully")
+                
+        except subprocess.CalledProcessError as e:
+            error_msg = f"LaTeX compilation failed:\\n{e.stderr}"
+            if "command not found" in e.stderr or "No such file" in str(e):
+                error_msg += "\\n\\nMake sure pdflatex is installed and available in your PATH."
+            raise RuntimeError(error_msg)
+        except FileNotFoundError:
+            raise RuntimeError("pdflatex not found. Please install a LaTeX distribution (e.g., TeX Live, MiKTeX).")
+
+
 ######################## main
 
 if __name__ == "__main__":
+    # === STREAMLINED MAIN EXECUTION USING draw_tree() OR generate_pdf() ===
     # Initialize default file and process command-line arguments
     ef_file = DEFAULTFILE
-    commandline(sys.argv)  # Sets global variables: ef_file, scale, grid
+    output_mode, pdf_requested, output_pdf = commandline(sys.argv)
     
-    # Generate complete TikZ code
+    # Display help if no arguments provided
+    if len(sys.argv) == 1:
+        print("DrawTree - Game tree drawing tool")
+        print()
+        print("Usage:")
+        print("  python drawtree.py <file.ef> [options]           # Generate TikZ code")
+        print("  python drawtree.py <file.ef> --pdf [options]     # Generate PDF (requires pdflatex)")
+        print("  python drawtree.py <file.ef> --output=name.pdf   # Generate PDF with custom name")
+        print()
+        print("Options:")
+        print("  scale=X.X    Set scale factor (0.01 to 100)")
+        print("  grid         Show helper grid")
+        print("  --pdf        Generate PDF output instead of TikZ")
+        print("  --output=X   Specify output PDF filename")
+        print()
+        print("Examples:")
+        print("  # Traditional workflow:")
+        print("  python drawtree.py games/example.ef > output.tex")
+        print("  pdflatex q.tex  # (if you have q.tex wrapper)")
+        print()
+        print("  # New single-step PDF generation:")
+        print("  python drawtree.py games/example.ef --pdf")
+        print("  python drawtree.py games/example.ef --output=mygame.pdf scale=0.8")
+        print()
+        print("Note: PDF generation requires pdflatex to be installed and available in PATH.")
+        sys.exit(0)
+    
     try:
-        tikz_code = draw_tree(
-            ef_file=ef_file, 
-            scale_factor=scale, 
-            show_grid=grid,
-            macros_file_path="macros-drawtree.tex"
-        )
-        
-        # Output the complete TikZ code
-        print(tikz_code)
+        if pdf_requested:
+            # Generate PDF directly
+            pdf_path = generate_pdf(
+                ef_file=ef_file,
+                output_pdf=output_pdf,
+                scale_factor=scale,
+                show_grid=grid
+            )
+            print(f"PDF generated successfully: {pdf_path}")
+        else:
+            # Generate TikZ code (original behavior)
+            tikz_code = draw_tree(
+                ef_file=ef_file, 
+                scale_factor=scale, 
+                show_grid=grid,
+                macros_file_path="macros-drawtree.tex"
+            )
+            
+            # Output the complete TikZ code
+            print(tikz_code)
         
     except FileNotFoundError:
-        print(f"Error: Could not find file {ef_file}")
-        print("Make sure the .ef file exists in the current directory")
+        print(f"Error: Could not find file {ef_file}", file=sys.stderr)
+        print("Make sure the .ef file exists in the current directory", file=sys.stderr)
+        sys.exit(1)
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"Error processing {ef_file}: {e}")
+        print(f"Error processing {ef_file}: {e}", file=sys.stderr)
         sys.exit(1)
 
