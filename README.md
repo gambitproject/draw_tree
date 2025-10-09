@@ -29,56 +29,36 @@ For example, on MacOS you can install [MacTEX](https://www.tug.org/mactex/mactex
 
 Note, images do not render well in VSCode, so open Jupyter Lab or Jupyter Notebook to see the images.
 
-1. Create a virtual environment (tested with Python 3.13) e.g.
-
-    ```
-    conda create --name draw_tree python=3.13
-    conda activate draw_tree
-    ```
-2. Install dependencies
-
-    ```
-    pip install -r requirements.txt
-    ```
-3. [WIP expected API] In a Python script or Jupyter notebook, run:
+In a ~~Python script or~~ Jupyter notebook, run:
 
     ```python
     from drawtree import draw_tree
-    draw_tree(
-        game='games/example.ef',
-        name='example',
-        render_as='pdf'
-    )
+    example_tikz = draw_tree('example.ef')
+    get_ipython().run_cell_magic("tikz", "", example_tikz)
     ```
-    The `render_as` argument can be 'pdf', 'png', or 'tikz'. The first two will create files `example.pdf` or `example.png` in the current directory. The last will return a string with the TikZ code that you can use in your own LaTeX documents, or view in your Jupyter notebook with.
 
-## Testing
+## Developer docs: Testing
 
 The project includes a comprehensive test suite using pytest. To run the tests:
 
-1. Set up the venv as above
+1. Create a virtual environment (tested with Python 3.13) e.g.
+    ```bash
+    conda create --name draw_tree python=3.13
+    conda activate draw_tree
+    ```
 
-2. Run all tests:
+2. Install dependencies
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3. Run all tests:
     ```bash
     pytest test_drawtree.py -v
     ```
 
-3. Run tests with coverage:
+4. Run tests with coverage:
     ```bash
     pip install pytest-cov
     pytest test_drawtree.py --cov=drawtree --cov-report=html
     ```
-
-4. Run specific test classes:
-    ```bash
-    pytest test_drawtree.py::TestUtilityFunctions -v
-    pytest test_drawtree.py::TestTikzGeneration -v
-    ```
-
-The test suite covers:
-- Utility functions (mathematical operations, formatting)
-- String parsing and node operations
-- File I/O operations
-- TikZ code generation
-- Command-line argument processing
-- Player and geometry functions
