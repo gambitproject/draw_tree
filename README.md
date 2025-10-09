@@ -5,23 +5,19 @@
 
 ## CLI
 
-By default, `draw_tree` generates TikZ code and prints it to standard output.
-This can copied into a LaTeX document. **TODO:** is this accurate?
-
-To generate TikZ code from an EF file:
+By default, `draw_tree` generates TikZ code and prints it to standard output; this can copied into a LaTeX document.
+There are also options to generate PDF or PNG files directly, either by specifying the desired format or by using the output filename extension:
 
 ```bash
-python drawtree.py games/example.ef
+python drawtree.py games/example.ef                                 # Prints TikZ code to stdout
+python drawtree.py games/example.ef --pdf                           # Creates example.pdf
+python drawtree.py games/example.ef --output=custom.pdf             # Creates custom.pdf
+python drawtree.py games/example.ef --png                           # Creates example.png
+python drawtree.py games/example.ef --png --dpi=600                 # Creates high-res example.png (600 DPI)
+python drawtree.py games/example.ef --output=mygame.png scale=0.8   # Creates mygame.png with 0.8 scaling
 ```
 
-You can also create a PDF from the EF file:
-
-```bash
-python drawtree.py games/example.ef --pdf                    # Creates example.pdf
-python drawtree.py games/example.ef --output=custom.pdf      # Creates custom.pdf
-```
-
-Note: PDF generation requires `pdflatex` to be installed and available in PATH.
+Note: PDF and PNG generation require `pdflatex` to be installed and available in PATH.
 
 For example, on MacOS you can install [MacTEX](https://www.tug.org/mactex/mactex-download.html)
 
@@ -34,7 +30,7 @@ In a ~~Python script or~~ Jupyter notebook, run:
 ```python
 from drawtree import draw_tree
 example_tikz = draw_tree('example.ef')
-get_ipython().run_cell_magic("tikz", "", example_tikz)
+get_ipython().run_cell_magic("tikz", "", example_tikz)  # Requires the jupyter-tikz extension
 ```
 
 ## Developer docs: Testing
