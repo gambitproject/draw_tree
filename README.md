@@ -3,19 +3,27 @@
 🚧 `draw_tree` is a work in progress and not currently usable. 🚧
 
 
-## Steps to run (on MacOS)
+## CLI
 
-1. Install [MacTEX](https://www.tug.org/mactex/mactex-download.html)
-    - This took ages because it's 5.9 GB...
-    - Is there an easier way to package LaTeX with PyGambit?
-2. Use CLI: Create the pdf from the ef file:
+By default, `draw_tree` generates TikZ code and prints it to standard output.
+This can copied into a LaTeX document. **TODO:** is this accurate?
+
+To generate TikZ code from an EF file:
+
+    ```
+    python drawtree.py games/example.ef
+    ```
+
+You can also create a PDF from the EF file:
 
     ```
     python drawtree.py games/example.ef --pdf                    # Creates example.pdf
     python drawtree.py games/example.ef --output=custom.pdf      # Creates custom.pdf
     ```
-3. Open the resulting PDF file
 
+Note: PDF generation requires `pdflatex` to be installed and available in PATH.
+
+For example, on MacOS you can install [MacTEX](https://www.tug.org/mactex/mactex-download.html)
 
 ## Python API
 
