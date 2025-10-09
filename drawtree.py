@@ -1248,21 +1248,22 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False, 
             macro_lines.append(line)
 
     # Step 4: Combine everything into complete TikZ code
-    tikz_code = """% TikZ code with q.tex styling using TikZ style definitions
-% TikZ libraries required for game trees
-\\usetikzlibrary{shapes}
-\\usetikzlibrary{arrows.meta}
+    tikz_code = """
+                % TikZ code with q.tex styling using TikZ style definitions
+                % TikZ libraries required for game trees
+                \\usetikzlibrary{shapes}
+                \\usetikzlibrary{arrows.meta}
 
-% Style settings to approximate q.tex formatting
-\\tikzset{
-    every node/.append style={font=\\rmfamily},
-    every text node part/.append style={align=center},
-    node distance=1.5mm,
-    thick
-}
+                % Style settings to approximate q.tex formatting
+                \\tikzset{
+                    every node/.append style={font=\\rmfamily},
+                    every text node part/.append style={align=center},
+                    node distance=1.5mm,
+                    thick
+                }
 
-% Macro definitions from macros-drawtree.tex
-"""
+                % Macro definitions from macros-drawtree.tex
+                """
 
     # Add macro definitions
     for macro in macro_lines:
@@ -1304,32 +1305,33 @@ def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: f
     tikz_content = draw_tree(ef_file, scale_factor, show_grid)
     
     # Create LaTeX wrapper document (based on q.tex)
-    latex_document = f"""% Auto-generated wrapper for game tree drawing from {ef_file}
-\\documentclass[a4paper,12pt]{{article}}
-\\usepackage{{newpxtext,newpxmath}}
-\\linespread{{1.10}}        % Palatino needs more leading (space between lines) 
-\\usepackage{{graphicx}}
-\\usepackage{{tikz}}
-\\usetikzlibrary{{shapes}}
-\\usetikzlibrary{{arrows.meta}}
-\\oddsidemargin=.46cm 
-\\textwidth=15cm
-\\textheight=24cm
-\\topmargin=-1.3cm
-\\parindent 0pt
-\\parskip1ex
-\\pagestyle{{empty}}
+    latex_document = f"""
+                        % Auto-generated wrapper for game tree drawing from {ef_file}
+                        \\documentclass[a4paper,12pt]{{article}}
+                        \\usepackage{{newpxtext,newpxmath}}
+                        \\linespread{{1.10}}        % Palatino needs more leading (space between lines) 
+                        \\usepackage{{graphicx}}
+                        \\usepackage{{tikz}}
+                        \\usetikzlibrary{{shapes}}
+                        \\usetikzlibrary{{arrows.meta}}
+                        \\oddsidemargin=.46cm 
+                        \\textwidth=15cm
+                        \\textheight=24cm
+                        \\topmargin=-1.3cm
+                        \\parindent 0pt
+                        \\parskip1ex
+                        \\pagestyle{{empty}}
 
-\\begin{{document}}
+                        \\begin{{document}}
 
-\\hrule
+                        \\hrule
 
-{tikz_content}
+                        {tikz_content}
 
-\\hrule
+                        \\hrule
 
-\\end{{document}}
-"""
+                        \\end{{document}}
+                    """
     
     # Use temporary directory for LaTeX compilation
     with tempfile.TemporaryDirectory() as temp_dir:
