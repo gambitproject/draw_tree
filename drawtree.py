@@ -1105,66 +1105,6 @@ def commandline(argv: List[str]) -> None:
             ef_file = arg
     return
 
-def create_tikz_from_file(tex_file_path, macros_file_path="macros-drawtree.tex"):
-    """
-    Create TikZ code by combining macros and game tree content from separate files.
-
-    Args:
-        tex_file_path (str): Path to the .tex file containing the tikzpicture content
-        macros_file_path (str): Path to the macros file (default: "macros-drawtree.tex")
-
-    Returns:
-        str: Complete TikZ code ready for %%tikz magic command
-    """
-
-    # Read the macros file
-    try:
-        with open(macros_file_path, "r") as f:
-            macros_content = f.read()
-    except FileNotFoundError:
-        print(f"Warning: Could not find macros file {macros_file_path}")
-        macros_content = ""
-
-    # Read the tikzpicture content
-    try:
-        with open(tex_file_path, "r") as f:
-            tikz_content = f.read()
-    except FileNotFoundError:
-        print(f"Error: Could not find file {tex_file_path}")
-        return ""
-
-    # Extract macro definitions from the macros file
-    macro_lines = []
-    for line in macros_content.split("\n"):
-        line = line.strip()
-        if line and not line.startswith("%"):
-            macro_lines.append(line)
-
-    tikz_code = """% TikZ code with q.tex styling using TikZ style definitions
-                    % TikZ libraries required for game trees
-                    \\usetikzlibrary{shapes}
-                    \\usetikzlibrary{arrows.meta}
-
-                    % Style settings to approximate q.tex formatting
-                    \\tikzset{
-                        every node/.append style={font=\\rmfamily},
-                        every text node part/.append style={align=center},
-                        node distance=1.5mm,
-                        thick
-                    }
-
-                    % Macro definitions from macros-drawtree.tex
-                    """
-
-    # Add macro definitions
-    for macro in macro_lines:
-        tikz_code += macro + "\n"
-
-    tikz_code += "\n% Game tree content from " + tex_file_path + "\n"
-    tikz_code += tikz_content
-
-    return tikz_code
-
 def ef_to_tex(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
     """
     Convert an extensive form (.ef) file to TikZ code.

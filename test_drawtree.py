@@ -154,59 +154,6 @@ class TestFileOperations:
             drawtree.readfile("nonexistent_file.txt")
 
 
-class TestTikzGeneration:
-    """Test TikZ code generation functions (legacy create_tikz_from_file)."""
-
-    def test_create_tikz_from_file_basic(self):
-        """Test basic TikZ code generation."""
-        # Create temporary files
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.tex') as tikz_file:
-            tikz_file.write("\\begin{tikzpicture}\n\\node at (0,0) {test};\n\\end{tikzpicture}")
-            tikz_filename = tikz_file.name
-
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.tex') as macro_file:
-            macro_file.write("\\newcommand\\testmacro{value}\n% comment line\n\\newdimen\\testdim")
-            macro_filename = macro_file.name
-
-        try:
-            result = drawtree.create_tikz_from_file(tikz_filename, macro_filename)
-            
-            # Verify the result contains expected components
-            assert "\\usetikzlibrary{shapes}" in result
-            assert "\\usetikzlibrary{arrows.meta}" in result
-            assert "\\newcommand\\testmacro{value}" in result
-            assert "\\newdimen\\testdim" in result
-            assert "\\begin{tikzpicture}" in result
-            assert "% comment line" not in result  # Comments should be filtered
-            
-        finally:
-            os.unlink(tikz_filename)
-            os.unlink(macro_filename)
-
-    def test_create_tikz_from_file_missing_files(self):
-        """Test TikZ generation with missing files."""
-        with patch('builtins.print') as mock_print:
-            result = drawtree.create_tikz_from_file("nonexistent.tex", "nonexistent_macro.tex")
-            assert result == ""
-            # Should print error message
-            mock_print.assert_called()
-
-    def test_create_tikz_from_file_missing_macros(self):
-        """Test TikZ generation with missing macro file."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.tex') as tikz_file:
-            tikz_file.write("\\begin{tikzpicture}\n\\end{tikzpicture}")
-            tikz_filename = tikz_file.name
-
-        try:
-            with patch('builtins.print') as mock_print:
-                result = drawtree.create_tikz_from_file(tikz_filename, "nonexistent_macro.tex")
-                # Should still work but print warning
-                assert "\\begin{tikzpicture}" in result
-                mock_print.assert_called()
-        finally:
-            os.unlink(tikz_filename)
-
-
 class TestCommandLineProcessing:
     """Test command-line argument processing."""
 
