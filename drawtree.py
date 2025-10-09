@@ -1553,7 +1553,6 @@ if __name__ == "__main__":
         print("  --dpi=X      Set PNG resolution in DPI (72-2400, default: 300)")
         print()
         print("Examples:")
-        print("  # New single-step generation:")
         print("  python drawtree.py games/example.ef --pdf")
         print("  python drawtree.py games/example.ef --png --dpi=600")
         print("  python drawtree.py games/example.ef --output=mygame.png scale=0.8")
