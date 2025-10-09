@@ -1165,6 +1165,155 @@ def create_tikz_from_file(tex_file_path, macros_file_path="macros-drawtree.tex")
 
     return tikz_code
 
+def ef_to_tex(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
+    """
+    Convert an extensive form (.ef) file to TikZ code.
+    
+    This function replicates the main processing logic but returns the TikZ code
+    as a string instead of printing it to stdout.
+    
+    Args:
+        ef_file: Path to the .ef file to process.
+        scale_factor: Scale factor for the diagram (default: 1.0).
+        show_grid: Whether to show grid lines (default: False).
+        
+    Returns:
+        Complete TikZ code as a string.
+    """
+    global scale, grid
+    
+    # Save original state
+    original_outstream = outstream.copy()
+    original_stream0 = stream0.copy()
+    original_nodes = nodes.copy()
+    original_xshifts = xshifts.copy()
+    original_playerdefined = playerdefined.copy()
+    original_scale = scale
+    original_grid = grid
+    
+    try:
+        # Reset global state
+        outstream.clear()
+        stream0.clear()
+        nodes.clear()
+        xshifts.clear()
+        for i in range(len(playerdefined)):
+            playerdefined[i] = False
+        
+        # Set parameters
+        scale = scale_factor
+        grid = show_grid
+        
+        # Process the .ef file (same logic as main)
+        lines = readfile(ef_file)
+
+        # begin tikz picture
+        outs("\\begin{tikzpicture}[scale="+str(scale), stream0)
+        ss = "  , StealthFill/.tip={Stealth[line width=.7pt"
+        outs(ss+",inset=0pt,length=13pt,angle'=30]}]", stream0)
+        ss = ""
+        if not grid:
+            ss = "% "
+        outs(ss+"\\draw [help lines, color=green] (-5,0) grid (5,-6);", stream0)
+
+        # main loop
+        for line in lines:
+            comment(line)
+            words = line.split()
+            if len(words) > 0:
+                if words[0] == "player":
+                    player(words)
+                elif words[0] == "level":
+                    level(words)
+                elif words[0] == "iset":
+                    isetgen(words)
+
+        # Output nodes
+        drawnodes()
+        
+        # end tikz picture - add to outstream so it comes after nodes
+        outs("\\end{tikzpicture}", outstream)
+        
+        # Combine all output into a single string
+        all_lines = stream0 + outstream
+        return "\n".join(all_lines)
+        
+    finally:
+        # Restore original state
+        outstream.clear()
+        outstream.extend(original_outstream)
+        stream0.clear()
+        stream0.extend(original_stream0)
+        nodes.clear()
+        nodes.update(original_nodes)
+        xshifts.clear()
+        xshifts.update(original_xshifts)
+        for i in range(len(playerdefined)):
+            playerdefined[i] = original_playerdefined[i]
+        scale = original_scale
+        grid = original_grid
+
+def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False, macros_file_path: str = "macros-drawtree.tex") -> str:
+    """
+    Generate complete TikZ code from an extensive form (.ef) file.
+    
+    This function combines ef_to_tex and create_tikz_from_file into a single
+    streamlined call that goes directly from .ef file to complete TikZ code.
+    
+    Args:
+        ef_file: Path to the .ef file to process.
+        scale_factor: Scale factor for the diagram (default: 1.0).
+        show_grid: Whether to show grid lines (default: False).
+        macros_file_path: Path to the macros file (default: "macros-drawtree.tex").
+        
+    Returns:
+        Complete TikZ code ready for use in Jupyter notebooks or LaTeX documents.
+    """
+    # Step 1: Generate the tikzpicture content using ef_to_tex logic
+    tikz_picture_content = ef_to_tex(ef_file, scale_factor, show_grid)
+    
+    # Step 2: Read and process the macros file
+    try:
+        with open(macros_file_path, "r") as f:
+            macros_content = f.read()
+    except FileNotFoundError:
+        print(f"Warning: Could not find macros file {macros_file_path}")
+        macros_content = ""
+
+    # Step 3: Extract macro definitions from the macros file
+    macro_lines = []
+    for line in macros_content.split("\n"):
+        line = line.strip()
+        if line and not line.startswith("%"):
+            macro_lines.append(line)
+
+    # Step 4: Combine everything into complete TikZ code
+    tikz_code = """% TikZ code with q.tex styling using TikZ style definitions
+% TikZ libraries required for game trees
+\\usetikzlibrary{shapes}
+\\usetikzlibrary{arrows.meta}
+
+% Style settings to approximate q.tex formatting
+\\tikzset{
+    every node/.append style={font=\\rmfamily},
+    every text node part/.append style={align=center},
+    node distance=1.5mm,
+    thick
+}
+
+% Macro definitions from macros-drawtree.tex
+"""
+
+    # Add macro definitions
+    for macro in macro_lines:
+        tikz_code += macro + "\n"
+
+    tikz_code += f"\n% Game tree content from {ef_file}\n"
+    tikz_code += tikz_picture_content
+
+    return tikz_code
+
+
 ######################## main
 
 if __name__ == "__main__":
