@@ -2,4 +2,5 @@
 *.log
 *.pyc
 *.ipynb_checkpoints
+.tmp.driveupload/*
 games/*.tex
