@@ -55,24 +55,17 @@ get_ipython().run_cell_magic("tikz", "", example_tikz)  # Requires the jupyter-t
 
 The project includes a comprehensive test suite using pytest. To run the tests:
 
-1. Create a virtual environment (tested with Python 3.13) e.g.
-```bash
-conda create --name draw_tree python=3.13
-conda activate draw_tree
-```
-
-2. Install dependencies
+Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run all tests:
+Run all tests:
 ```bash
 pytest test_drawtree.py -v
 ```
 
-4. Run tests with coverage:
+Run tests with coverage:
 ```bash
-pip install pytest-cov
 pytest test_drawtree.py --cov=drawtree --cov-report=html
 ```
