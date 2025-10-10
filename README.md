@@ -47,9 +47,21 @@ python drawtree.py games/example.ef --png --dpi=600                 # Creates hi
 python drawtree.py games/example.ef --output=mygame.png scale=0.8   # Creates mygame.png with 0.8 scaling (0.01 to 100)
 ```
 
-## Displaying in Jupyter Notebooks
+## Python API
 
-Note, images do not render well in VSCode, so open Jupyter Lab or Jupyter Notebook to see the images.
+You can also use `draw_tree` as a Python library:
+
+```python
+from drawtree import generate_tex, generate_pdf, generate_png
+generate_tex('games/example.ef')                                    # Creates example.tex
+generate_tex('games/example.ef', output='custom.tex')               # Creates custom.tex
+generate_pdf('games/example.ef')                                    # Creates example.pdf
+generate_png('games/example.ef')                                    # Creates example.png
+generate_png('games/example.ef', dpi=600)                           # Creates high-res example.png (72-2400, default: 300)
+generate_png('games/example.ef', output='mygame.png', scale=0.8)    # Creates mygame.png with 0.8 scaling (0.01 to 100)
+```
+
+### Rendering in Jupyter Notebooks
 
 First install the requirements, which include the `jupyter-tikz` extension:
 ```bash
@@ -61,7 +73,7 @@ In a Jupyter notebook, run:
 ```python
 %load_ext jupyter_tikz
 from drawtree import draw_tree
-example_tikz = draw_tree('example.ef')
+example_tikz = draw_tree('games/example.ef')
 get_ipython().run_cell_magic("tikz", "", example_tikz)
 ```
 
