@@ -412,65 +412,178 @@ class TestPngGeneration:
             os.unlink(ef_file_path)
 
 
+class TestTexGeneration:
+    """Test LaTeX document generation functionality."""
+
+    def test_generate_tex_missing_file(self):
+        """Test LaTeX generation with missing .ef file."""
+        with pytest.raises(FileNotFoundError):
+            drawtree.generate_tex("nonexistent.ef")
+
+    def test_generate_tex_default_parameters(self):
+        """Test LaTeX generation with default parameters."""
+        # Create a temporary .ef file
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
+            ef_file.write("player 1\nlevel 0 node root player 1\n")
+            ef_file_path = ef_file.name
+
+        try:
+            # Generate LaTeX file
+            tex_path = drawtree.generate_tex(ef_file_path)
+            
+            # Verify the file was created and contains expected content
+            assert os.path.exists(tex_path)
+            
+            with open(tex_path, 'r') as f:
+                content = f.read()
+                
+            # Check for LaTeX document structure
+            assert "\\documentclass[a4paper,12pt]{article}" in content
+            assert "\\usepackage{tikz}" in content
+            assert "\\begin{document}" in content
+            assert "\\end{document}" in content
+            assert "\\begin{tikzpicture}" in content
+            assert "\\end{tikzpicture}" in content
+            
+            # Clean up generated file
+            os.unlink(tex_path)
+            
+        finally:
+            os.unlink(ef_file_path)
+
+    def test_generate_tex_custom_filename(self):
+        """Test LaTeX generation with custom output filename."""
+        # Create a temporary .ef file
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
+            ef_file.write("player 1\nlevel 0 node root player 1\n")
+            ef_file_path = ef_file.name
+
+        try:
+            custom_filename = "custom_output.tex"
+            tex_path = drawtree.generate_tex(ef_file_path, output_tex=custom_filename)
+            
+            # Verify the custom filename was used
+            assert tex_path.endswith(custom_filename)
+            assert os.path.exists(custom_filename)
+            
+            # Clean up
+            os.unlink(custom_filename)
+            
+        finally:
+            os.unlink(ef_file_path)
+
+    def test_generate_tex_with_scale_and_grid(self):
+        """Test LaTeX generation with scale and grid options."""
+        # Create a temporary .ef file
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
+            ef_file.write("player 1\nlevel 0 node root player 1\n")
+            ef_file_path = ef_file.name
+
+        try:
+            tex_path = drawtree.generate_tex(ef_file_path, scale_factor=2.0, show_grid=True)
+            
+            # Verify the file was created
+            assert os.path.exists(tex_path)
+            
+            with open(tex_path, 'r') as f:
+                content = f.read()
+                
+            # Check for scale and grid options
+            assert "scale=2" in content
+            assert "\\draw [help lines, color=green]" in content
+            
+            # Clean up
+            os.unlink(tex_path)
+            
+        finally:
+            os.unlink(ef_file_path)
+
+
 class TestCommandlineArguments:
-    """Test command line argument parsing for new PNG functionality."""
+    """Test command line argument parsing for new functionality."""
 
     def test_commandline_png_flag(self):
         """Test --png flag parsing."""
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--png'])
-        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert output_mode == "png"
         assert not pdf_requested
         assert png_requested
+        assert not tex_requested
         assert output_file is None
         assert dpi is None
 
     def test_commandline_png_with_dpi(self):
         """Test --png flag with --dpi option."""
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=600'])
-        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert output_mode == "png"
         assert not pdf_requested
         assert png_requested
+        assert not tex_requested
         assert output_file is None
         assert dpi == 600
 
     def test_commandline_png_output_file(self):
         """Test PNG output with custom filename."""
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--output=custom.png'])
-        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert output_mode == "png"
         assert not pdf_requested
         assert png_requested
+        assert not tex_requested
         assert output_file == "custom.png"
         assert dpi is None
 
     def test_commandline_pdf_output_file(self):
         """Test PDF output with custom filename."""
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--output=custom.pdf'])
-        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert output_mode == "pdf"
         assert pdf_requested
         assert not png_requested
+        assert not tex_requested
         assert output_file == "custom.pdf"
+        assert dpi is None
+
+    def test_commandline_tex_flag(self):
+        """Test --tex flag parsing."""
+        result = drawtree.commandline(['drawtree.py', 'test.ef', '--tex'])
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
+        assert output_mode == "tex"
+        assert not pdf_requested
+        assert not png_requested
+        assert tex_requested
+        assert output_file is None
+        assert dpi is None
+
+    def test_commandline_tex_output_file(self):
+        """Test LaTeX output with custom filename."""
+        result = drawtree.commandline(['drawtree.py', 'test.ef', '--output=custom.tex'])
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
+        assert output_mode == "tex"
+        assert not pdf_requested
+        assert not png_requested
+        assert tex_requested
+        assert output_file == "custom.tex"
         assert dpi is None
 
     def test_commandline_invalid_dpi(self):
         """Test invalid DPI values."""
         # Too low DPI should default to 300
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=50'])
-        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert dpi == 300  # Should default to 300 for out-of-range values
 
         # Too high DPI should default to 300
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=5000'])
-        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert dpi == 300  # Should default to 300 for out-of-range values
 
     def test_commandline_invalid_dpi_string(self):
         """Test non-numeric DPI values."""
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=high'])
-        output_mode, pdf_requested, png_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert dpi == 300  # Should default to 300 for invalid values
 
 
