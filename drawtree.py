@@ -1302,6 +1302,44 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False, 
     return tikz_code
 
 
+def latex_wrapper(tikz_code: str) -> str:
+    """
+    Wrap TikZ code in a complete LaTeX document.
+    
+    Args:
+        tikz_code: The TikZ code to embed in the document.
+    Returns:
+        Complete LaTeX document as a string.
+    """
+    latex_document = f"""
+                        \\documentclass[a4paper,12pt]{{article}}
+                        \\usepackage{{newpxtext,newpxmath}}
+                        \\linespread{{1.10}}        % Palatino needs more leading (space between lines) 
+                        \\usepackage{{graphicx}}
+                        \\usepackage{{tikz}}
+                        \\usetikzlibrary{{shapes}}
+                        \\usetikzlibrary{{arrows.meta}}
+                        \\oddsidemargin=.46cm 
+                        \\textwidth=15cm
+                        \\textheight=24cm
+                        \\topmargin=-1.3cm
+                        \\parindent 0pt
+                        \\parskip1ex
+                        \\pagestyle{{empty}}
+
+                        \\begin{{document}}
+
+                        \\hrule
+
+                        {tikz_code}
+
+                        \\hrule
+
+                        \\end{{document}}
+                    """
+    return latex_document
+
+
 def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: float = 1.0, show_grid: bool = False, cleanup: bool = True) -> str:
     """
     Generate a PDF directly from an extensive form (.ef) file.
@@ -1331,34 +1369,8 @@ def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: f
     # Generate TikZ content using draw_tree
     tikz_content = draw_tree(ef_file, scale_factor, show_grid)
     
-    # Create LaTeX wrapper document (based on q.tex)
-    latex_document = f"""
-                        % Auto-generated wrapper for game tree drawing from {ef_file}
-                        \\documentclass[a4paper,12pt]{{article}}
-                        \\usepackage{{newpxtext,newpxmath}}
-                        \\linespread{{1.10}}        % Palatino needs more leading (space between lines) 
-                        \\usepackage{{graphicx}}
-                        \\usepackage{{tikz}}
-                        \\usetikzlibrary{{shapes}}
-                        \\usetikzlibrary{{arrows.meta}}
-                        \\oddsidemargin=.46cm 
-                        \\textwidth=15cm
-                        \\textheight=24cm
-                        \\topmargin=-1.3cm
-                        \\parindent 0pt
-                        \\parskip1ex
-                        \\pagestyle{{empty}}
-
-                        \\begin{{document}}
-
-                        \\hrule
-
-                        {tikz_content}
-
-                        \\hrule
-
-                        \\end{{document}}
-                    """
+    # Create LaTeX wrapper document
+    latex_document = latex_wrapper(tikz_content)
     
     # Use temporary directory for LaTeX compilation
     with tempfile.TemporaryDirectory() as temp_dir:
