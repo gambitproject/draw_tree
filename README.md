@@ -4,24 +4,33 @@
 
 ## Requirements
 
-- Python 3.7+
+- Python 3.7+ (tested on 3.13)
 - LaTeX with TikZ (for PDF/PNG generation)
 - (optional) ImageMagick or Ghostscript or Poppler (for PNG generation)
 
 ### Installing LaTeX
 
-Note: PDF and PNG generation require `pdflatex` to be installed and available in PATH. For example, on MacOS you can install [MacTEX](https://www.tug.org/mactex/mactex-download.html). Other options include:
+Note: PDF and PNG generation require `pdflatex` to be installed and available in PATH. Tested methods have a ✅ next to them. Methods include:
 
-- macOS: `brew install --cask mactex` (may require adding `/Library/TeX/texbin` to your PATH)
-- Ubuntu: `sudo apt-get install texlive-full`
-- Windows: `Install MiKTeX from https://miktex.org/download`
+- macOS:
+    - Install [MacTEX](https://www.tug.org/mactex/mactex-download.html) ✅
+    - `brew install --cask mactex`
+- Ubuntu:
+    - `sudo apt-get install texlive-full`
+- Windows: Install [MiKTeX](https://miktex.org/download)
 
 ### PNG generation
 
-PNG generation also requires either ImageMagick or Ghostscript or Poppler to be installed. For example:
-- macOS: `brew install imagemagick ghostscript poppler`
-- Ubuntu: `sudo apt-get install imagemagick ghostscript poppler-utils`
-- Windows: `Install ImageMagick or Ghostscript from their websites`
+PNG generation will default to using any of ImageMagick or Ghostscript or Poppler that are installed. If none are installed, so one of the following:
+- macOS:
+    - `brew install imagemagick`
+    - `brew install ghostscript`
+    - `brew install poppler`
+- Ubuntu:
+    - `sudo apt-get install imagemagick`
+    - `sudo apt-get install ghostscript`
+    - `sudo apt-get install poppler-utils`
+- Windows: Install ImageMagick or Ghostscript from their websites
 
 ## CLI
 
