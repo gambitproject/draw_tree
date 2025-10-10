@@ -1080,7 +1080,7 @@ def isetgen(words: List[str]) -> None:
 
 ########### command-line arguments
 
-def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], Optional[int]]:
+def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], Optional[int], bool]:
     """
     Process command-line arguments to set global configuration.
     
@@ -1091,13 +1091,14 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
         argv: List of command-line arguments (including script name).
         
     Returns:
-        Tuple of (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi) where:
+        Tuple of (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex) where:
         - output_mode: 'tikz', 'pdf', 'png', or 'tex'
         - pdf_requested: True if --pdf flag was provided
         - png_requested: True if --png flag was provided
         - tex_requested: True if --tex flag was provided
         - output_file: Custom output filename if specified
         - dpi: DPI setting for PNG output (None if not specified)
+        - use_tinytex: True if --tinytex flag was provided
     """
     global grid
     global scale 
@@ -1108,6 +1109,7 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
     tex_requested = False
     output_file = None
     dpi = None
+    use_tinytex = False
     
     for arg in argv[1:]:
         if arg[:5] == "scale":
@@ -1128,6 +1130,8 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
             png_requested = True
         elif arg == "--tex":
             tex_requested = True
+        elif arg == "--tinytex":
+            use_tinytex = True
         elif arg.startswith("--output="):
             output_file = arg[9:]  # Remove "--output=" prefix
             if output_file.endswith('.pdf'):
@@ -1161,7 +1165,7 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
     else:
         output_mode = "tikz"
     
-    return (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi)
+    return (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex)
 
 def ef_to_tex(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
     """
@@ -1348,7 +1352,46 @@ def latex_wrapper(tikz_code: str) -> str:
     return latex_document
 
 
-def generate_tex(ef_file: str, output_tex: Optional[str] = None, scale_factor: float = 1.0, show_grid: bool = False) -> str:
+def latex_wrapper_tinytex(tikz_code: str) -> str:
+    """
+    Wrap TikZ code in a complete LaTeX document compatible with minimal TinyTeX installation.
+    
+    This version uses only packages that come with TinyTeX by default or are commonly available.
+    
+    Args:
+        tikz_code: The TikZ code to embed in the document.
+    Returns:
+        Complete LaTeX document as a string.
+    """
+    latex_document = f"""
+                        \\documentclass[a4paper,12pt]{{article}}
+                        \\usepackage{{amsmath,amsfonts}}
+                        \\usepackage{{graphicx}}
+                        \\usepackage{{tikz}}
+                        \\usetikzlibrary{{shapes}}
+                        \\usetikzlibrary{{arrows.meta}}
+                        \\oddsidemargin=.46cm 
+                        \\textwidth=15cm
+                        \\textheight=24cm
+                        \\topmargin=-1.3cm
+                        \\parindent 0pt
+                        \\parskip1ex
+                        \\pagestyle{{empty}}
+
+                        \\begin{{document}}
+
+                        \\hrule
+
+                        {tikz_code}
+
+                        \\hrule
+
+                        \\end{{document}}
+                    """
+    return latex_document
+
+
+def generate_tex(ef_file: str, output_tex: Optional[str] = None, scale_factor: float = 1.0, show_grid: bool = False, use_tinytex: bool = False) -> str:
     """
     Generate a complete LaTeX document file directly from an extensive form (.ef) file.
     
@@ -1360,6 +1403,7 @@ def generate_tex(ef_file: str, output_tex: Optional[str] = None, scale_factor: f
         output_tex: Output LaTeX filename. If None, derives from ef_file name.
         scale_factor: Scale factor for the diagram (default: 1.0).
         show_grid: Whether to show grid lines (default: False).
+        use_tinytex: Whether to use TinyTeX-compatible wrapper (default: False).
         
     Returns:
         Path to the generated LaTeX file.
@@ -1376,7 +1420,10 @@ def generate_tex(ef_file: str, output_tex: Optional[str] = None, scale_factor: f
     tikz_content = draw_tree(ef_file, scale_factor, show_grid)
     
     # Wrap in complete LaTeX document
-    latex_document = latex_wrapper(tikz_content)
+    if use_tinytex:
+        latex_document = latex_wrapper_tinytex(tikz_content)
+    else:
+        latex_document = latex_wrapper(tikz_content)
     
     # Write to file
     with open(output_tex, 'w') as f:
@@ -1385,7 +1432,26 @@ def generate_tex(ef_file: str, output_tex: Optional[str] = None, scale_factor: f
     return str(Path(output_tex).absolute())
 
 
-def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: float = 1.0, show_grid: bool = False, cleanup: bool = True) -> str:
+def detect_tinytex() -> Optional[str]:
+    """
+    Detect if TinyTeX is installed and return the path to pdflatex.
+    
+    Returns:
+        Path to TinyTeX's pdflatex if found, None otherwise.
+    """
+    tinytex_paths = [
+        os.path.expanduser("~/.pytinytex/bin/universal-darwin/pdflatex"),  # macOS
+        os.path.expanduser("~/.pytinytex/bin/x86_64-linux/pdflatex"),     # Linux x64
+        os.path.expanduser("~/.pytinytex/bin/windows/pdflatex.exe"),      # Windows
+    ]
+    
+    for path in tinytex_paths:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: float = 1.0, show_grid: bool = False, cleanup: bool = True, use_tinytex: bool = False) -> str:
     """
     Generate a PDF directly from an extensive form (.ef) file.
     
@@ -1398,6 +1464,7 @@ def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: f
         scale_factor: Scale factor for the diagram (default: 1.0).
         show_grid: Whether to show grid lines (default: False).
         cleanup: Whether to remove temporary files (default: True).
+        use_tinytex: Whether to use TinyTeX-compatible wrapper (default: False).
         
     Returns:
         Path to the generated PDF file.
@@ -1415,7 +1482,10 @@ def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: f
     tikz_content = draw_tree(ef_file, scale_factor, show_grid)
     
     # Create LaTeX wrapper document
-    latex_document = latex_wrapper(tikz_content)
+    if use_tinytex:
+        latex_document = latex_wrapper_tinytex(tikz_content)
+    else:
+        latex_document = latex_wrapper(tikz_content)
     
     # Use temporary directory for LaTeX compilation
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -1426,10 +1496,27 @@ def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: f
         with open(tex_file, 'w', encoding='utf-8') as f:
             f.write(latex_document)
         
-        # Compile with pdflatex
+        # Compile with pdflatex - try TinyTeX first if use_tinytex is True or if regular pdflatex not found
+        pdflatex_cmd = 'pdflatex'
+        if use_tinytex:
+            tinytex_path = detect_tinytex()
+            if tinytex_path:
+                pdflatex_cmd = tinytex_path
+        else:
+            # Check if regular pdflatex exists, if not try TinyTeX as fallback
+            try:
+                subprocess.run(['pdflatex', '--version'], capture_output=True, check=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                tinytex_path = detect_tinytex()
+                if tinytex_path:
+                    pdflatex_cmd = tinytex_path
+                    print("Using TinyTeX pdflatex (system pdflatex not found)")
+                else:
+                    raise RuntimeError("pdflatex not found. Please install a LaTeX distribution (e.g., TeX Live, MiKTeX).")
+        
         try:
             subprocess.run([
-                'pdflatex', 
+                pdflatex_cmd, 
                 '-interaction=nonstopmode',
                 '-output-directory', str(temp_path),
                 str(tex_file)
@@ -1589,7 +1676,7 @@ if __name__ == "__main__":
     # === STREAMLINED MAIN EXECUTION USING draw_tree(), generate_pdf(), OR generate_png() ===
     # Initialize default file and process command-line arguments
     ef_file = DEFAULTFILE
-    output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = commandline(sys.argv)
+    output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex = commandline(sys.argv)
     
     # Display help if no arguments provided
     if len(sys.argv) == 1:
@@ -1608,6 +1695,7 @@ if __name__ == "__main__":
         print("  --pdf        Generate PDF output instead of TikZ")
         print("  --png        Generate PNG output instead of TikZ")
         print("  --tex        Generate LaTeX document instead of TikZ")
+        print("  --tinytex    Use TinyTeX-compatible LaTeX wrapper (minimal packages)")
         print("  --output=X   Specify output filename (.pdf, .png, or .tex extension determines format)")
         print("  --dpi=X      Set PNG resolution in DPI (72-2400, default: 300)")
         print()
@@ -1615,6 +1703,7 @@ if __name__ == "__main__":
         print("  python drawtree.py games/example.ef --pdf")
         print("  python drawtree.py games/example.ef --png --dpi=600")
         print("  python drawtree.py games/example.ef --tex")
+        print("  python drawtree.py games/example.ef --tex --tinytex")
         print("  python drawtree.py games/example.ef --output=mygame.tex scale=0.8")
         print()
         print("Note: PDF/PNG generation requires pdflatex. PNG also needs ImageMagick or Ghostscript.")
@@ -1623,11 +1712,14 @@ if __name__ == "__main__":
     try:
         if output_mode == "pdf":
             print(f"Generating PDF: {output_file}")
+            if use_tinytex:
+                print("Using TinyTeX-compatible LaTeX wrapper")
             pdf_path = generate_pdf(
                 ef_file=ef_file,
                 output_pdf=output_file,
                 scale_factor=scale,
-                show_grid=grid
+                show_grid=grid,
+                use_tinytex=use_tinytex
             )
             print(f"PDF generated successfully: {pdf_path}")
         
@@ -1652,11 +1744,14 @@ if __name__ == "__main__":
                 base_name = os.path.splitext(os.path.basename(ef_file))[0]
                 output_file = f"{base_name}.tex"
             print(f"Generating LaTeX: {output_file}")
+            if use_tinytex:
+                print("Using TinyTeX-compatible LaTeX wrapper")
             tex_path = generate_tex(
                 ef_file=ef_file,
                 output_tex=output_file,
                 scale_factor=scale,
-                show_grid=grid
+                show_grid=grid,
+                use_tinytex=use_tinytex
             )
             print(f"LaTeX generated successfully: {tex_path}")
         

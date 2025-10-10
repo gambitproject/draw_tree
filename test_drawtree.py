@@ -412,6 +412,66 @@ class TestPngGeneration:
             os.unlink(ef_file_path)
 
 
+class TestTinyTexSupport:
+    """Test TinyTeX compatibility features."""
+
+    def test_detect_tinytex(self):
+        """Test TinyTeX detection function."""
+        from drawtree import detect_tinytex
+        
+        # This test will depend on whether TinyTeX is actually installed
+        result = detect_tinytex()
+        # Should either return a valid path or None
+        if result is not None:
+            assert os.path.exists(result)
+            assert result.endswith('pdflatex') or result.endswith('pdflatex.exe')
+
+    def test_latex_wrapper_tinytex(self):
+        """Test TinyTeX-compatible LaTeX wrapper."""
+        from drawtree import latex_wrapper_tinytex
+        
+        tikz_code = "\\begin{tikzpicture}\n\\node at (0,0) {Test};\n\\end{tikzpicture}"
+        result = latex_wrapper_tinytex(tikz_code)
+        
+        # Check that it contains TinyTeX-compatible packages
+        assert "\\usepackage{amsmath,amsfonts}" in result
+        assert "\\usepackage{tikz}" in result
+        assert "\\begin{document}" in result
+        assert "\\end{document}" in result
+        assert tikz_code in result
+        
+        # Should NOT contain newpx packages
+        assert "newpxtext" not in result
+        assert "newpxmath" not in result
+
+    def test_generate_tex_tinytex_mode(self):
+        """Test LaTeX generation with TinyTeX mode."""
+        # Create a temporary .ef file
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
+            ef_file.write("player 1\nlevel 0 node root player 1\n")
+            ef_file_path = ef_file.name
+
+        try:
+            tex_path = drawtree.generate_tex(ef_file_path, use_tinytex=True)
+            
+            # Verify the file was created
+            assert os.path.exists(tex_path)
+            
+            with open(tex_path, 'r') as f:
+                content = f.read()
+                
+            # Check for TinyTeX-compatible packages
+            assert "\\usepackage{amsmath,amsfonts}" in content
+            assert "newpxtext" not in content
+            assert "newpxmath" not in content
+            
+            # Clean up
+            os.unlink(tex_path)
+            
+        finally:
+            os.unlink(ef_file_path)
+
+
 class TestTexGeneration:
     """Test LaTeX document generation functionality."""
 
@@ -505,85 +565,103 @@ class TestCommandlineArguments:
     def test_commandline_png_flag(self):
         """Test --png flag parsing."""
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--png'])
-        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex = result
         assert output_mode == "png"
         assert not pdf_requested
         assert png_requested
         assert not tex_requested
         assert output_file is None
         assert dpi is None
+        assert not use_tinytex
 
     def test_commandline_png_with_dpi(self):
         """Test --png flag with --dpi option."""
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=600'])
-        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex = result
         assert output_mode == "png"
         assert not pdf_requested
         assert png_requested
         assert not tex_requested
         assert output_file is None
         assert dpi == 600
+        assert not use_tinytex
 
     def test_commandline_png_output_file(self):
         """Test PNG output with custom filename."""
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--output=custom.png'])
-        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex = result
         assert output_mode == "png"
         assert not pdf_requested
         assert png_requested
         assert not tex_requested
         assert output_file == "custom.png"
         assert dpi is None
+        assert not use_tinytex
 
     def test_commandline_pdf_output_file(self):
         """Test PDF output with custom filename."""
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--output=custom.pdf'])
-        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex = result
         assert output_mode == "pdf"
         assert pdf_requested
         assert not png_requested
         assert not tex_requested
         assert output_file == "custom.pdf"
         assert dpi is None
+        assert not use_tinytex
 
     def test_commandline_tex_flag(self):
         """Test --tex flag parsing."""
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--tex'])
-        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex = result
         assert output_mode == "tex"
         assert not pdf_requested
         assert not png_requested
         assert tex_requested
         assert output_file is None
         assert dpi is None
+        assert not use_tinytex
 
     def test_commandline_tex_output_file(self):
         """Test LaTeX output with custom filename."""
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--output=custom.tex'])
-        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex = result
         assert output_mode == "tex"
         assert not pdf_requested
         assert not png_requested
         assert tex_requested
         assert output_file == "custom.tex"
         assert dpi is None
+        assert not use_tinytex
+
+    def test_commandline_tinytex_flag(self):
+        """Test --tinytex flag parsing."""
+        result = drawtree.commandline(['drawtree.py', 'test.ef', '--tex', '--tinytex'])
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex = result
+        assert output_mode == "tex"
+        assert not pdf_requested  
+        assert not png_requested
+        assert tex_requested
+        assert output_file is None
+        assert dpi is None
+        assert use_tinytex
 
     def test_commandline_invalid_dpi(self):
         """Test invalid DPI values."""
         # Too low DPI should default to 300
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=50'])
-        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex = result
         assert dpi == 300  # Should default to 300 for out-of-range values
 
         # Too high DPI should default to 300
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=5000'])
-        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex = result
         assert dpi == 300  # Should default to 300 for out-of-range values
 
     def test_commandline_invalid_dpi_string(self):
         """Test non-numeric DPI values."""
         result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=high'])
-        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
+        output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex = result
         assert dpi == 300  # Should default to 300 for invalid values
 
 
