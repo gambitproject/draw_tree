@@ -1289,20 +1289,20 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) 
 
     # Step 3: Combine everything into complete TikZ code
     tikz_code = """% TikZ code with built-in styling for game trees
-% TikZ libraries required for game trees
-\\usetikzlibrary{shapes}
-\\usetikzlibrary{arrows.meta}
+                % TikZ libraries required for game trees
+                \\usetikzlibrary{shapes}
+                \\usetikzlibrary{arrows.meta}
 
-% Style settings for game tree formatting
-\\tikzset{
-    every node/.append style={font=\\rmfamily},
-    every text node part/.append style={align=center},
-    node distance=1.5mm,
-    thick
-}
+                % Style settings for game tree formatting
+                \\tikzset{
+                    every node/.append style={font=\\rmfamily},
+                    every text node part/.append style={align=center},
+                    node distance=1.5mm,
+                    thick
+                }
 
-% Built-in macro definitions for game tree drawing
-"""
+                % Built-in macro definitions for game tree drawing
+                """
 
     # Add macro definitions
     for macro in macro_definitions:
