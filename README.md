@@ -21,7 +21,7 @@ Note: PDF and PNG generation require `pdflatex` to be installed and available in
 
 ### PNG generation
 
-PNG generation will default to using any of ImageMagick or Ghostscript or Poppler that are installed. If none are installed, so one of the following:
+PNG generation will default to using any of ImageMagick or Ghostscript or Poppler that are installed. If none are installed, try one of the following:
 - macOS:
     - `brew install imagemagick`
     - `brew install ghostscript`
