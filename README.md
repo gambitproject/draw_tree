@@ -42,20 +42,25 @@ python drawtree.py games/example.ef --output=mygame.png scale=0.8   # Creates my
 
 Note, images do not render well in VSCode, so open Jupyter Lab or Jupyter Notebook to see the images.
 
+First install the requirements, which include the `jupyter-tikz` extension:
+```bash
+pip install -r requirements.txt
+```
+
 In a Jupyter notebook, run:
 
 ```python
 %load_ext jupyter_tikz
 from drawtree import draw_tree
 example_tikz = draw_tree('example.ef')
-get_ipython().run_cell_magic("tikz", "", example_tikz)  # Requires the jupyter-tikz extension
+get_ipython().run_cell_magic("tikz", "", example_tikz)
 ```
 
 ## Developer docs: Testing
 
 The project includes a comprehensive test suite using pytest. To run the tests:
 
-Install dependencies:
+Install requirements:
 ```bash
 pip install -r requirements.txt
 ```
