@@ -5,21 +5,25 @@
 
 ## CLI
 
-By default, `draw_tree` generates TikZ code and prints it to standard output; this can copied into a LaTeX document.
-There are also options to generate PDF or PNG files directly, either by specifying the desired format or by using the output filename extension:
+By default, `draw_tree` generates TikZ code and prints it to standard output.
+There are also options to generate a complete LaTeX document, a PDF or a PNG directly, either by specifying the desired format or by using the output filename extension:
 
 ```bash
 python drawtree.py games/example.ef                                 # Prints TikZ code to stdout
+python drawtree.py games/example.ef --tex                           # Creates example.tex
+python drawtree.py games/example.ef --output=custom.tex             # Creates custom.tex
 python drawtree.py games/example.ef --pdf                           # Creates example.pdf
-python drawtree.py games/example.ef --output=custom.pdf             # Creates custom.pdf
 python drawtree.py games/example.ef --png                           # Creates example.png
-python drawtree.py games/example.ef --png --dpi=600                 # Creates high-res example.png (600 DPI)
-python drawtree.py games/example.ef --output=mygame.png scale=0.8   # Creates mygame.png with 0.8 scaling
+python drawtree.py games/example.ef --png --dpi=600                 # Creates high-res example.png (72-2400, default: 300)
+python drawtree.py games/example.ef --output=mygame.png scale=0.8   # Creates mygame.png with 0.8 scaling (0.01 to 100)
 ```
 
-Note: PDF and PNG generation require `pdflatex` to be installed and available in PATH.
+Note: PDF and PNG generation require `pdflatex` to be installed and available in PATH. For example, on MacOS you can install [MacTEX](https://www.tug.org/mactex/mactex-download.html)
 
-For example, on MacOS you can install [MacTEX](https://www.tug.org/mactex/mactex-download.html)
+Note: PNG generation also requires either ImageMagick or Ghostscript or Poppler to be installed. For example:
+- macOS: `brew install imagemagick ghostscript poppler`
+- Ubuntu: `sudo apt-get install imagemagick ghostscript poppler-utils`
+- Windows: `Install ImageMagick or Ghostscript from their websites`
 
 ## Python API
 
