@@ -57,7 +57,29 @@ If you're using TinyTeX, use the `--tinytex` flag for better compatibility:
 ```bash
 python drawtree.py games/example.ef --pdf --tinytex    # Uses minimal LaTeX packages
 python drawtree.py games/example.ef --tex --tinytex    # Generates TinyTeX-compatible LaTeX
+python drawtree.py --test-tinytex                      # Test if TinyTeX is working (debugging)
 ```
+
+### Troubleshooting TinyTeX on Ubuntu/Linux
+
+TinyTeX installation sometimes fails on Ubuntu/Linux systems due to Perl dependency issues. If you encounter errors like "kpsewhich: 1: Syntax error", try these solutions:
+
+1. **Test basic functionality first:**
+   ```bash
+   python drawtree.py --test-tinytex
+   ```
+
+2. **Use system LaTeX instead:**
+   ```bash
+   sudo apt-get install texlive-latex-recommended texlive-pictures
+   ```
+
+3. **Manual TinyTeX fix (if needed):**
+   ```bash
+   export PATH="$HOME/.pytinytex/bin/x86_64-linux:$PATH"
+   tlmgr update --self
+   tlmgr install newpx pgf tikz-cd graphics tools amsmath amsfonts
+   ```
 
 ## Python API
 

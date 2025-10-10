@@ -1080,7 +1080,7 @@ def isetgen(words: List[str]) -> None:
 
 ########### command-line arguments
 
-def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], Optional[int], bool, bool]:
+def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], Optional[int], bool, bool, bool]:
     """
     Process command-line arguments to set global configuration.
     
@@ -1091,7 +1091,7 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
         argv: List of command-line arguments (including script name).
         
     Returns:
-        Tuple of (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex, install_tinytex) where:
+        Tuple of (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex, install_tinytex, test_tinytex) where:
         - output_mode: 'tikz', 'pdf', 'png', or 'tex'
         - pdf_requested: True if --pdf flag was provided
         - png_requested: True if --png flag was provided
@@ -1100,6 +1100,7 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
         - dpi: DPI setting for PNG output (None if not specified)
         - use_tinytex: True if --tinytex flag was provided
         - install_tinytex_requested: True if --install-tinytex flag was provided
+        - test_tinytex_requested: True if --test-tinytex flag was provided
     """
     global grid
     global scale 
@@ -1112,6 +1113,7 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
     dpi = None
     use_tinytex = False
     install_tinytex_requested = False
+    test_tinytex_requested = False
     
     for arg in argv[1:]:
         if arg[:5] == "scale":
@@ -1136,6 +1138,8 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
             use_tinytex = True
         elif arg == "--install-tinytex":
             install_tinytex_requested = True
+        elif arg == "--test-tinytex":
+            test_tinytex_requested = True
         elif arg.startswith("--output="):
             output_file = arg[9:]  # Remove "--output=" prefix
             if output_file.endswith('.pdf'):
@@ -1169,7 +1173,7 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
     else:
         output_mode = "tikz"
     
-    return (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex, install_tinytex_requested)
+    return (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex, install_tinytex_requested, test_tinytex_requested)
 
 def ef_to_tex(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
     """
@@ -1455,6 +1459,75 @@ def detect_tinytex() -> Optional[str]:
     return None
 
 
+def test_tinytex_basic(verbose: bool = True) -> bool:
+    """
+    Test if TinyTeX can compile a basic document without additional packages.
+    
+    Args:
+        verbose: Whether to print progress messages.
+        
+    Returns:
+        True if basic compilation works, False otherwise.
+    """
+    if verbose:
+        print("\n🔬 Testing basic TinyTeX functionality...")
+    
+    # Check if TinyTeX pdflatex exists
+    pdflatex_path = detect_tinytex()
+    if not pdflatex_path:
+        if verbose:
+            print("  ✗ TinyTeX pdflatex not found")
+        return False
+    
+    # Create a minimal test document
+    minimal_latex = """
+\\documentclass{article}
+\\usepackage{amsmath}
+\\begin{document}
+Hello, TinyTeX!
+\\end{document}
+"""
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        tex_file = temp_path / "test.tex"
+        
+        try:
+            # Write test file
+            with open(tex_file, 'w') as f:
+                f.write(minimal_latex)
+            
+            # Try to compile
+            result = subprocess.run([
+                pdflatex_path,
+                '-interaction=nonstopmode',
+                '-output-directory', str(temp_path),
+                str(tex_file)
+            ], capture_output=True, text=True, timeout=60)
+            
+            pdf_file = temp_path / "test.pdf"
+            if pdf_file.exists():
+                if verbose:
+                    print("  ✓ Basic TinyTeX compilation works!")
+                    print("  You can use DrawTree with --tinytex for basic functionality")
+                return True
+            else:
+                if verbose:
+                    print("  ✗ TinyTeX compilation failed")
+                    if result.stderr:
+                        print(f"  Error: {result.stderr[:200]}...")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            if verbose:
+                print("  ✗ TinyTeX compilation timed out")
+            return False
+        except Exception as e:
+            if verbose:
+                print(f"  ✗ TinyTeX test error: {e}")
+            return False
+
+
 def install_tinytex(verbose: bool = True) -> bool:
     """
     Install TinyTeX and required LaTeX packages for DrawTree.
@@ -1538,9 +1611,74 @@ def install_tinytex(verbose: bool = True) -> bool:
             print("  python drawtree.py games/example.ef --pdf --tinytex  # Use minimal wrapper")
         return True
     else:
+        # If package installation failed, test if basic TinyTeX still works
+        basic_works = test_tinytex_basic(verbose=verbose)
+        
         if verbose:
             print("\n❌ TinyTeX installation failed during package installation.")
-            print("You may still be able to use the TinyTeX-compatible wrapper with --tinytex")
+            if basic_works:
+                print("\n✓ However, basic TinyTeX functionality is working!")
+                print("You can still use DrawTree with limited features:")
+                print("  python drawtree.py games/example.ef --pdf --tinytex")
+                print("  python drawtree.py games/example.ef --tex --tinytex")
+            else:
+                print("\n❌ Basic TinyTeX functionality also failed.")
+            
+            print("\nThis is a known issue on some Ubuntu/Linux systems.")
+            print("Alternative solutions:")
+            print("  1. Use the TinyTeX-compatible wrapper: --tinytex")
+            print("  2. Install system LaTeX: sudo apt-get install texlive-latex-recommended texlive-pictures")
+            print("  3. Try manual TinyTeX fix:")
+            print("     export PATH=\"$HOME/.pytinytex/bin/x86_64-linux:$PATH\"")
+            print("     tlmgr update --self")
+            print("     tlmgr install newpx pgf tikz-cd graphics tools amsmath amsfonts")
+        
+        return basic_works  # Return True if at least basic functionality works
+
+
+def _fix_tinytex_ubuntu_issues(tlmgr_path: str, verbose: bool = True) -> bool:
+    """
+    Attempt to fix common TinyTeX issues on Ubuntu/Linux systems.
+    
+    Args:
+        tlmgr_path: Path to the tlmgr executable.
+        verbose: Whether to print progress messages.
+        
+    Returns:
+        True if fixes were applied successfully, False otherwise.
+    """
+    if verbose:
+        print("  Attempting to update TinyTeX repository and fix configuration...")
+    
+    try:
+        # Try to update the tlmgr itself first
+        subprocess.run(
+            [tlmgr_path, "update", "--self"], 
+            capture_output=True, text=True, check=True, timeout=120
+        )
+        if verbose:
+            print("  ✓ Updated tlmgr successfully")
+        
+        # Try to update the repository
+        subprocess.run(
+            [tlmgr_path, "update", "--all"], 
+            capture_output=True, text=True, check=True, timeout=300
+        )
+        if verbose:
+            print("  ✓ Updated TinyTeX repository")
+        
+        return True
+    except subprocess.CalledProcessError as e:
+        if verbose:
+            print(f"  ✗ Fix attempt failed: {e.stderr.strip() if e.stderr else str(e)}")
+        return False
+    except subprocess.TimeoutExpired:
+        if verbose:
+            print("  ✗ Fix attempt timed out")
+        return False
+    except Exception as e:
+        if verbose:
+            print(f"  ✗ Fix attempt error: {e}")
         return False
 
 
@@ -1575,6 +1713,39 @@ def _install_tinytex_packages(packages: List[str], verbose: bool = True) -> bool
             print("✗ Could not find tlmgr (TinyTeX package manager)")
         return False
     
+    # Test if tlmgr is working properly before attempting installations
+    if verbose:
+        print("  Testing tlmgr functionality...")
+    
+    try:
+        subprocess.run(
+            [tlmgr_path, "--version"], 
+            capture_output=True, text=True, check=True, timeout=30
+        )
+        if verbose:
+            print("  ✓ tlmgr is functional")
+    except subprocess.CalledProcessError as e:
+        if verbose:
+            print(f"  ✗ tlmgr test failed: {e.stderr.strip()}")
+            print("  This is a known issue on some Ubuntu systems with TinyTeX.")
+            print("  Attempting to fix TinyTeX configuration...")
+        
+        # Try to fix common Ubuntu TinyTeX issues
+        success = _fix_tinytex_ubuntu_issues(tlmgr_path, verbose)
+        if not success:
+            if verbose:
+                print("  ✗ Unable to fix TinyTeX issues.")
+                print("  You may need to install LaTeX packages manually or use system LaTeX.")
+            return False
+    except subprocess.TimeoutExpired:
+        if verbose:
+            print("  ✗ tlmgr test timed out")
+        return False
+    except Exception as e:
+        if verbose:
+            print(f"  ✗ tlmgr test error: {e}")
+        return False
+    
     # Install each package
     failed_packages = []
     for package in packages:
@@ -1584,13 +1755,22 @@ def _install_tinytex_packages(packages: List[str], verbose: bool = True) -> bool
         try:
             subprocess.run(
                 [tlmgr_path, "install", package], 
-                capture_output=True, text=True, check=True
+                capture_output=True, text=True, check=True, timeout=300
             )
             if verbose:
                 print(f"  ✓ {package} installed successfully")
         except subprocess.CalledProcessError as e:
+            error_msg = e.stderr.strip() if e.stderr else str(e)
             if verbose:
-                print(f"  ✗ Failed to install {package}: {e.stderr.strip()}")
+                if "kpsewhich: 1: Syntax error" in error_msg:
+                    print(f"  ✗ Failed to install {package}: TinyTeX configuration issue")
+                    print("      This is a known Ubuntu/Linux issue with TinyTeX")
+                else:
+                    print(f"  ✗ Failed to install {package}: {error_msg}")
+            failed_packages.append(package)
+        except subprocess.TimeoutExpired:
+            if verbose:
+                print(f"  ✗ Installation of {package} timed out")
             failed_packages.append(package)
         except Exception as e:
             if verbose:
@@ -1831,7 +2011,7 @@ if __name__ == "__main__":
     # === STREAMLINED MAIN EXECUTION USING draw_tree(), generate_pdf(), OR generate_png() ===
     # Initialize default file and process command-line arguments
     ef_file = DEFAULTFILE
-    output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex, install_tinytex_requested = commandline(sys.argv)
+    output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex, install_tinytex_requested, test_tinytex_requested = commandline(sys.argv)
     
     # Handle TinyTeX installation if requested
     if install_tinytex_requested:
@@ -1848,6 +2028,21 @@ if __name__ == "__main__":
             print(f"\n✗ TinyTeX installation error: {e}")
             sys.exit(1)
     
+    # Handle TinyTeX testing if requested  
+    if test_tinytex_requested:
+        try:
+            success = test_tinytex_basic(verbose=True)
+            if success:
+                print("\n✓ TinyTeX basic functionality works!")
+                print("You can use DrawTree with --tinytex flag.")
+            else:
+                print("\n✗ TinyTeX basic functionality failed.")
+                print("You may need to install system LaTeX or fix TinyTeX.")
+            sys.exit(0 if success else 1)
+        except Exception as e:
+            print(f"\n✗ TinyTeX test error: {e}")
+            sys.exit(1)
+    
     # Display help if no arguments provided
     if len(sys.argv) == 1:
         print("DrawTree - Game tree drawing tool")
@@ -1859,6 +2054,7 @@ if __name__ == "__main__":
         print("  python drawtree.py <file.ef> --tex [options]     # Generate LaTeX document")
         print("  python drawtree.py <file.ef> --output=name.ext   # Generate with custom filename (.pdf, .png, or .tex)")
         print("  python drawtree.py --install-tinytex             # Install TinyTeX and required packages")
+        print("  python drawtree.py --test-tinytex                # Test basic TinyTeX functionality")
         print()
         print("Options:")
         print("  scale=X.X    Set scale factor (0.01 to 100)")
@@ -1868,6 +2064,7 @@ if __name__ == "__main__":
         print("  --tex        Generate LaTeX document instead of TikZ")
         print("  --tinytex         Use TinyTeX-compatible LaTeX wrapper (minimal packages)")
         print("  --install-tinytex Install TinyTeX and required packages")
+        print("  --test-tinytex    Test basic TinyTeX functionality (debugging)")
         print("  --output=X        Specify output filename (.pdf, .png, or .tex extension determines format)")
         print("  --dpi=X           Set PNG resolution in DPI (72-2400, default: 300)")
         print()
