@@ -1080,7 +1080,7 @@ def isetgen(words: List[str]) -> None:
 
 ########### command-line arguments
 
-def commandline(argv: List[str]) -> tuple[str, bool, bool, Optional[str], Optional[int]]:
+def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], Optional[int]]:
     """
     Process command-line arguments to set global configuration.
     
@@ -1091,10 +1091,11 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, Optional[str], Option
         argv: List of command-line arguments (including script name).
         
     Returns:
-        Tuple of (output_mode, pdf_requested, png_requested, output_file, dpi) where:
-        - output_mode: 'tikz', 'pdf', or 'png'
+        Tuple of (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi) where:
+        - output_mode: 'tikz', 'pdf', 'png', or 'tex'
         - pdf_requested: True if --pdf flag was provided
         - png_requested: True if --png flag was provided
+        - tex_requested: True if --tex flag was provided
         - output_file: Custom output filename if specified
         - dpi: DPI setting for PNG output (None if not specified)
     """
@@ -1104,6 +1105,7 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, Optional[str], Option
     
     pdf_requested = False
     png_requested = False
+    tex_requested = False
     output_file = None
     dpi = None
     
@@ -1124,12 +1126,16 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, Optional[str], Option
             pdf_requested = True
         elif arg == "--png":
             png_requested = True
+        elif arg == "--tex":
+            tex_requested = True
         elif arg.startswith("--output="):
             output_file = arg[9:]  # Remove "--output=" prefix
             if output_file.endswith('.pdf'):
                 pdf_requested = True
             elif output_file.endswith('.png'):
                 png_requested = True
+            elif output_file.endswith('.tex'):
+                tex_requested = True
         elif arg.startswith("--dpi="):
             try:
                 dpi = int(arg[6:])  # Remove "--dpi=" prefix
@@ -1150,10 +1156,12 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, Optional[str], Option
         output_mode = "png"
     elif pdf_requested:
         output_mode = "pdf"
+    elif tex_requested:
+        output_mode = "tex"
     else:
         output_mode = "tikz"
     
-    return (output_mode, pdf_requested, png_requested, output_file, dpi)
+    return (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi)
 
 def ef_to_tex(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
     """
@@ -1338,6 +1346,43 @@ def latex_wrapper(tikz_code: str) -> str:
                         \\end{{document}}
                     """
     return latex_document
+
+
+def generate_tex(ef_file: str, output_tex: Optional[str] = None, scale_factor: float = 1.0, show_grid: bool = False) -> str:
+    """
+    Generate a complete LaTeX document file directly from an extensive form (.ef) file.
+    
+    This function creates a complete LaTeX document with embedded TikZ code
+    and saves it to a .tex file.
+    
+    Args:
+        ef_file: Path to the .ef file to process.
+        output_tex: Output LaTeX filename. If None, derives from ef_file name.
+        scale_factor: Scale factor for the diagram (default: 1.0).
+        show_grid: Whether to show grid lines (default: False).
+        
+    Returns:
+        Path to the generated LaTeX file.
+        
+    Raises:
+        FileNotFoundError: If the .ef file doesn't exist.
+    """
+    # Determine output filename
+    if output_tex is None:
+        ef_path = Path(ef_file)
+        output_tex = ef_path.with_suffix('.tex').name
+    
+    # Generate TikZ content using draw_tree
+    tikz_content = draw_tree(ef_file, scale_factor, show_grid)
+    
+    # Wrap in complete LaTeX document
+    latex_document = latex_wrapper(tikz_content)
+    
+    # Write to file
+    with open(output_tex, 'w') as f:
+        f.write(latex_document)
+    
+    return str(Path(output_tex).absolute())
 
 
 def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: float = 1.0, show_grid: bool = False, cleanup: bool = True) -> str:
@@ -1544,7 +1589,7 @@ if __name__ == "__main__":
     # === STREAMLINED MAIN EXECUTION USING draw_tree(), generate_pdf(), OR generate_png() ===
     # Initialize default file and process command-line arguments
     ef_file = DEFAULTFILE
-    output_mode, pdf_requested, png_requested, output_file, dpi = commandline(sys.argv)
+    output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = commandline(sys.argv)
     
     # Display help if no arguments provided
     if len(sys.argv) == 1:
@@ -1554,20 +1599,23 @@ if __name__ == "__main__":
         print("  python drawtree.py <file.ef> [options]           # Generate TikZ code")
         print("  python drawtree.py <file.ef> --pdf [options]     # Generate PDF (requires pdflatex)")
         print("  python drawtree.py <file.ef> --png [options]     # Generate PNG (requires pdflatex + imagemagick/ghostscript)")
-        print("  python drawtree.py <file.ef> --output=name.ext   # Generate with custom filename (.pdf or .png)")
+        print("  python drawtree.py <file.ef> --tex [options]     # Generate LaTeX document")
+        print("  python drawtree.py <file.ef> --output=name.ext   # Generate with custom filename (.pdf, .png, or .tex)")
         print()
         print("Options:")
         print("  scale=X.X    Set scale factor (0.01 to 100)")
         print("  grid         Show helper grid")
         print("  --pdf        Generate PDF output instead of TikZ")
         print("  --png        Generate PNG output instead of TikZ")
-        print("  --output=X   Specify output filename (.pdf or .png extension determines format)")
+        print("  --tex        Generate LaTeX document instead of TikZ")
+        print("  --output=X   Specify output filename (.pdf, .png, or .tex extension determines format)")
         print("  --dpi=X      Set PNG resolution in DPI (72-2400, default: 300)")
         print()
         print("Examples:")
         print("  python drawtree.py games/example.ef --pdf")
         print("  python drawtree.py games/example.ef --png --dpi=600")
-        print("  python drawtree.py games/example.ef --output=mygame.png scale=0.8")
+        print("  python drawtree.py games/example.ef --tex")
+        print("  python drawtree.py games/example.ef --output=mygame.tex scale=0.8")
         print()
         print("Note: PDF/PNG generation requires pdflatex. PNG also needs ImageMagick or Ghostscript.")
         sys.exit(0)
@@ -1597,6 +1645,20 @@ if __name__ == "__main__":
                 dpi=dpi if dpi is not None else 300
             )
             print(f"PNG generated successfully: {png_path}")
+        
+        elif output_mode == "tex":
+            # Use default TEX filename if none specified
+            if output_file is None:
+                base_name = os.path.splitext(os.path.basename(ef_file))[0]
+                output_file = f"{base_name}.tex"
+            print(f"Generating LaTeX: {output_file}")
+            tex_path = generate_tex(
+                ef_file=ef_file,
+                output_tex=output_file,
+                scale_factor=scale,
+                show_grid=grid
+            )
+            print(f"LaTeX generated successfully: {tex_path}")
         
         else:
             # Generate TikZ code (original behavior)
