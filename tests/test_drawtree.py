@@ -12,7 +12,7 @@ import os
 from unittest.mock import patch
 
 # Import the module under test
-import drawtree
+import draw_tree.core as drawtree
 
 
 class TestUtilityFunctions:
