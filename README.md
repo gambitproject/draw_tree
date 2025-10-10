@@ -25,13 +25,14 @@ Note: PNG generation also requires either ImageMagick or Ghostscript or Poppler 
 - Ubuntu: `sudo apt-get install imagemagick ghostscript poppler-utils`
 - Windows: `Install ImageMagick or Ghostscript from their websites`
 
-## Python API
+## Displaying in Jupyter Notebooks
 
 Note, images do not render well in VSCode, so open Jupyter Lab or Jupyter Notebook to see the images.
 
-In a ~~Python script or~~ Jupyter notebook, run:
+In a Jupyter notebook, run:
 
 ```python
+%load_ext jupyter_tikz
 from drawtree import draw_tree
 example_tikz = draw_tree('example.ef')
 get_ipython().run_cell_magic("tikz", "", example_tikz)  # Requires the jupyter-tikz extension
