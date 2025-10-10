@@ -2,6 +2,26 @@
 
 🚧 `draw_tree` is a work in progress and not currently usable. 🚧
 
+## Requirements
+
+- Python 3.7+
+- LaTeX with TikZ (for PDF/PNG generation)
+- (optional) ImageMagick or Ghostscript or Poppler (for PNG generation)
+
+### Installing LaTeX
+
+Note: PDF and PNG generation require `pdflatex` to be installed and available in PATH. For example, on MacOS you can install [MacTEX](https://www.tug.org/mactex/mactex-download.html). Other options include:
+
+- macOS: `brew install --cask mactex` (may require adding `/Library/TeX/texbin` to your PATH)
+- Ubuntu: `sudo apt-get install texlive-full`
+- Windows: `Install MiKTeX from https://miktex.org/download`
+
+### PNG generation
+
+PNG generation also requires either ImageMagick or Ghostscript or Poppler to be installed. For example:
+- macOS: `brew install imagemagick ghostscript poppler`
+- Ubuntu: `sudo apt-get install imagemagick ghostscript poppler-utils`
+- Windows: `Install ImageMagick or Ghostscript from their websites`
 
 ## CLI
 
@@ -17,13 +37,6 @@ python drawtree.py games/example.ef --png                           # Creates ex
 python drawtree.py games/example.ef --png --dpi=600                 # Creates high-res example.png (72-2400, default: 300)
 python drawtree.py games/example.ef --output=mygame.png scale=0.8   # Creates mygame.png with 0.8 scaling (0.01 to 100)
 ```
-
-Note: PDF and PNG generation require `pdflatex` to be installed and available in PATH. For example, on MacOS you can install [MacTEX](https://www.tug.org/mactex/mactex-download.html)
-
-Note: PNG generation also requires either ImageMagick or Ghostscript or Poppler to be installed. For example:
-- macOS: `brew install imagemagick ghostscript poppler`
-- Ubuntu: `sudo apt-get install imagemagick ghostscript poppler-utils`
-- Windows: `Install ImageMagick or Ghostscript from their websites`
 
 ## Displaying in Jupyter Notebooks
 
