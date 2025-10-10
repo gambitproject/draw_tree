@@ -1080,7 +1080,7 @@ def isetgen(words: List[str]) -> None:
 
 ########### command-line arguments
 
-def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], Optional[int], bool]:
+def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], Optional[int], bool, bool]:
     """
     Process command-line arguments to set global configuration.
     
@@ -1091,7 +1091,7 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
         argv: List of command-line arguments (including script name).
         
     Returns:
-        Tuple of (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex) where:
+        Tuple of (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex, install_tinytex) where:
         - output_mode: 'tikz', 'pdf', 'png', or 'tex'
         - pdf_requested: True if --pdf flag was provided
         - png_requested: True if --png flag was provided
@@ -1099,6 +1099,7 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
         - output_file: Custom output filename if specified
         - dpi: DPI setting for PNG output (None if not specified)
         - use_tinytex: True if --tinytex flag was provided
+        - install_tinytex_requested: True if --install-tinytex flag was provided
     """
     global grid
     global scale 
@@ -1110,6 +1111,7 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
     output_file = None
     dpi = None
     use_tinytex = False
+    install_tinytex_requested = False
     
     for arg in argv[1:]:
         if arg[:5] == "scale":
@@ -1132,6 +1134,8 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
             tex_requested = True
         elif arg == "--tinytex":
             use_tinytex = True
+        elif arg == "--install-tinytex":
+            install_tinytex_requested = True
         elif arg.startswith("--output="):
             output_file = arg[9:]  # Remove "--output=" prefix
             if output_file.endswith('.pdf'):
@@ -1165,7 +1169,7 @@ def commandline(argv: List[str]) -> tuple[str, bool, bool, bool, Optional[str], 
     else:
         output_mode = "tikz"
     
-    return (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex)
+    return (output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex, install_tinytex_requested)
 
 def ef_to_tex(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
     """
@@ -1451,6 +1455,157 @@ def detect_tinytex() -> Optional[str]:
     return None
 
 
+def install_tinytex(verbose: bool = True) -> bool:
+    """
+    Install TinyTeX and required LaTeX packages for DrawTree.
+    
+    This function downloads and installs TinyTeX, then installs all the
+    LaTeX packages required for generating PDFs and LaTeX documents.
+    
+    Args:
+        verbose: Whether to print progress messages (default: True).
+        
+    Returns:
+        True if installation was successful, False otherwise.
+        
+    Raises:
+        ImportError: If PyTinyTeX is not installed.
+        RuntimeError: If installation fails.
+    """
+    if verbose:
+        print("🚀 Starting TinyTeX installation for DrawTree...")
+        print("This may take a few minutes on first run.")
+    
+    try:
+        from pytinytex import download_tinytex, get_pdf_latex_engine
+    except ImportError:
+        raise ImportError(
+            "PyTinyTeX is not installed. Please install it with:\n"
+            "    pip install PyTinyTeX\n"
+            "or run:\n"
+            "    pip install -r requirements.txt"
+        )
+    
+    # Step 1: Download and install TinyTeX
+    if verbose:
+        print("\n📥 Step 1: Downloading TinyTeX...")
+    
+    try:
+        download_tinytex()
+        if verbose:
+            print("✓ TinyTeX downloaded successfully")
+    except Exception as e:
+        if verbose:
+            print(f"✗ Failed to download TinyTeX: {e}")
+        return False
+    
+    # Step 2: Verify TinyTeX installation
+    if verbose:
+        print("\n🔍 Step 2: Verifying TinyTeX installation...")
+    
+    try:
+        pdflatex_path = get_pdf_latex_engine()
+        if verbose:
+            print(f"✓ TinyTeX pdflatex found at: {pdflatex_path}")
+    except Exception as e:
+        if verbose:
+            print(f"✗ TinyTeX verification failed: {e}")
+        return False
+    
+    # Step 3: Install required LaTeX packages
+    if verbose:
+        print("\n📦 Step 3: Installing required LaTeX packages...")
+    
+    # Required packages for DrawTree LaTeX generation
+    required_packages = [
+        "newpx",      # Provides newpxtext and newpxmath (for full LaTeX wrapper)
+        "pgf",        # Provides tikz
+        "tikz-cd",    # Additional TikZ libraries
+        "graphics",   # Ensures graphicx is available
+        "tools",      # Basic LaTeX tools
+        "amsmath",    # Math support (usually included but ensure it's there)
+        "amsfonts",   # Math fonts (for TinyTeX wrapper)
+    ]
+    
+    success = _install_tinytex_packages(required_packages, verbose=verbose)
+    
+    if success:
+        if verbose:
+            print("\n🎉 TinyTeX installation completed successfully!")
+            print("\nYou can now use DrawTree with the following commands:")
+            print("  python drawtree.py games/example.ef --pdf")
+            print("  python drawtree.py games/example.ef --tex")
+            print("  python drawtree.py games/example.ef --pdf --tinytex  # Use minimal wrapper")
+        return True
+    else:
+        if verbose:
+            print("\n❌ TinyTeX installation failed during package installation.")
+            print("You may still be able to use the TinyTeX-compatible wrapper with --tinytex")
+        return False
+
+
+def _install_tinytex_packages(packages: List[str], verbose: bool = True) -> bool:
+    """
+    Install LaTeX packages using TinyTeX's tlmgr.
+    
+    Internal helper function for install_tinytex().
+    
+    Args:
+        packages: List of package names to install.
+        verbose: Whether to print progress messages.
+        
+    Returns:
+        True if all packages installed successfully, False otherwise.
+    """
+    # Find tlmgr executable
+    tlmgr_paths = [
+        os.path.expanduser("~/.pytinytex/bin/universal-darwin/tlmgr"),  # macOS
+        os.path.expanduser("~/.pytinytex/bin/x86_64-linux/tlmgr"),     # Linux x64  
+        os.path.expanduser("~/.pytinytex/bin/windows/tlmgr.exe"),      # Windows
+    ]
+    
+    tlmgr_path = None
+    for path in tlmgr_paths:
+        if os.path.exists(path):
+            tlmgr_path = path
+            break
+    
+    if not tlmgr_path:
+        if verbose:
+            print("✗ Could not find tlmgr (TinyTeX package manager)")
+        return False
+    
+    # Install each package
+    failed_packages = []
+    for package in packages:
+        if verbose:
+            print(f"  Installing {package}...")
+        
+        try:
+            subprocess.run(
+                [tlmgr_path, "install", package], 
+                capture_output=True, text=True, check=True
+            )
+            if verbose:
+                print(f"  ✓ {package} installed successfully")
+        except subprocess.CalledProcessError as e:
+            if verbose:
+                print(f"  ✗ Failed to install {package}: {e.stderr.strip()}")
+            failed_packages.append(package)
+        except Exception as e:
+            if verbose:
+                print(f"  ✗ Error installing {package}: {e}")
+            failed_packages.append(package)
+    
+    if failed_packages:
+        if verbose:
+            print(f"\n⚠️  Some packages failed to install: {', '.join(failed_packages)}")
+            print("This may affect some LaTeX features, but basic functionality should work.")
+        return len(failed_packages) < len(packages)  # Partial success
+    
+    return True
+
+
 def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: float = 1.0, show_grid: bool = False, cleanup: bool = True, use_tinytex: bool = False) -> str:
     """
     Generate a PDF directly from an extensive form (.ef) file.
@@ -1676,7 +1831,22 @@ if __name__ == "__main__":
     # === STREAMLINED MAIN EXECUTION USING draw_tree(), generate_pdf(), OR generate_png() ===
     # Initialize default file and process command-line arguments
     ef_file = DEFAULTFILE
-    output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex = commandline(sys.argv)
+    output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi, use_tinytex, install_tinytex_requested = commandline(sys.argv)
+    
+    # Handle TinyTeX installation if requested
+    if install_tinytex_requested:
+        try:
+            success = install_tinytex(verbose=True)
+            if success:
+                print("\n✓ TinyTeX installation completed successfully!")
+                print("You can now use DrawTree with PDF and PNG output.")
+            else:
+                print("\n✗ TinyTeX installation failed.")
+                print("Please check the error messages above and try again.")
+            sys.exit(0 if success else 1)
+        except Exception as e:
+            print(f"\n✗ TinyTeX installation error: {e}")
+            sys.exit(1)
     
     # Display help if no arguments provided
     if len(sys.argv) == 1:
@@ -1688,6 +1858,7 @@ if __name__ == "__main__":
         print("  python drawtree.py <file.ef> --png [options]     # Generate PNG (requires pdflatex + imagemagick/ghostscript)")
         print("  python drawtree.py <file.ef> --tex [options]     # Generate LaTeX document")
         print("  python drawtree.py <file.ef> --output=name.ext   # Generate with custom filename (.pdf, .png, or .tex)")
+        print("  python drawtree.py --install-tinytex             # Install TinyTeX and required packages")
         print()
         print("Options:")
         print("  scale=X.X    Set scale factor (0.01 to 100)")
@@ -1695,9 +1866,10 @@ if __name__ == "__main__":
         print("  --pdf        Generate PDF output instead of TikZ")
         print("  --png        Generate PNG output instead of TikZ")
         print("  --tex        Generate LaTeX document instead of TikZ")
-        print("  --tinytex    Use TinyTeX-compatible LaTeX wrapper (minimal packages)")
-        print("  --output=X   Specify output filename (.pdf, .png, or .tex extension determines format)")
-        print("  --dpi=X      Set PNG resolution in DPI (72-2400, default: 300)")
+        print("  --tinytex         Use TinyTeX-compatible LaTeX wrapper (minimal packages)")
+        print("  --install-tinytex Install TinyTeX and required packages")
+        print("  --output=X        Specify output filename (.pdf, .png, or .tex extension determines format)")
+        print("  --dpi=X           Set PNG resolution in DPI (72-2400, default: 300)")
         print()
         print("Examples:")
         print("  python drawtree.py games/example.ef --pdf")
@@ -1705,8 +1877,10 @@ if __name__ == "__main__":
         print("  python drawtree.py games/example.ef --tex")
         print("  python drawtree.py games/example.ef --tex --tinytex")
         print("  python drawtree.py games/example.ef --output=mygame.tex scale=0.8")
+        print("  python drawtree.py --install-tinytex  # First-time setup")
         print()
         print("Note: PDF/PNG generation requires pdflatex. PNG also needs ImageMagick or Ghostscript.")
+        print("      Use --install-tinytex for automatic TinyTeX setup if you don't have LaTeX installed.")
         sys.exit(0)
     
     try:

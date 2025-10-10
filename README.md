@@ -18,12 +18,46 @@ python drawtree.py games/example.ef --png --dpi=600                 # Creates hi
 python drawtree.py games/example.ef --output=mygame.png scale=0.8   # Creates mygame.png with 0.8 scaling (0.01 to 100)
 ```
 
-Note: PDF and PNG generation require `pdflatex` to be installed and available in PATH. For example, on MacOS you can install [MacTEX](https://www.tug.org/mactex/mactex-download.html)
+## Installation
 
-Note: PNG generation also requires either ImageMagick or Ghostscript or Poppler to be installed. For example:
-- macOS: `brew install imagemagick ghostscript poppler`
-- Ubuntu: `sudo apt-get install imagemagick ghostscript poppler-utils`
-- Windows: `Install ImageMagick or Ghostscript from their websites`
+### Quick Setup (Recommended)
+
+For users who don't have LaTeX installed, DrawTree can automatically install TinyTeX (a lightweight LaTeX distribution):
+
+```bash
+# 1. Install Python requirements
+pip install -r requirements.txt
+
+# 2. Install TinyTeX and required packages (one of these methods):
+python drawtree.py --install-tinytex        # Method 1: Using CLI
+python install_tinytex.py                   # Method 2: Using dedicated script
+
+# 3. Use DrawTree normally
+python drawtree.py games/example.ef --pdf
+python drawtree.py games/example.ef --png
+```
+
+### Manual LaTeX Installation
+
+Alternatively, you can install a full LaTeX distribution:
+
+**PDF and PNG generation requirements:**
+- `pdflatex` must be installed and available in PATH
+- Examples: [MacTEX](https://www.tug.org/mactex/mactex-download.html) (macOS), TeX Live (Linux), MiKTeX (Windows)
+
+**PNG generation also requires one of:**
+- ImageMagick: `brew install imagemagick` (macOS), `sudo apt install imagemagick` (Ubuntu)
+- Ghostscript: `brew install ghostscript` (macOS), `sudo apt install ghostscript` (Ubuntu)  
+- Poppler: `brew install poppler` (macOS), `sudo apt install poppler-utils` (Ubuntu)
+
+### TinyTeX Compatibility
+
+If you're using TinyTeX, use the `--tinytex` flag for better compatibility:
+
+```bash
+python drawtree.py games/example.ef --pdf --tinytex    # Uses minimal LaTeX packages
+python drawtree.py games/example.ef --tex --tinytex    # Generates TinyTeX-compatible LaTeX
+```
 
 ## Python API
 
