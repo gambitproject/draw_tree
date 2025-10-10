@@ -1,5 +1,5 @@
 """
-Test suite for drawtree module.
+Test suite for draw_tree module.
 
 This module contains comprehensive tests for the game tree drawing functionality,
 including unit tests for utility functions, integration tests for file processing,
@@ -12,7 +12,7 @@ import os
 from unittest.mock import patch
 
 # Import the module under test
-import drawtree
+import draw_tree.core as draw_tree
 
 
 class TestUtilityFunctions:
@@ -20,54 +20,54 @@ class TestUtilityFunctions:
 
     def test_fformat_default_places(self):
         """Test fformat with default 3 decimal places."""
-        assert drawtree.fformat(3.14159) == "3.142"
-        assert drawtree.fformat(3.0) == "3"
-        assert drawtree.fformat(3.100) == "3.1"
+        assert draw_tree.fformat(3.14159) == "3.142"
+        assert draw_tree.fformat(3.0) == "3"
+        assert draw_tree.fformat(3.100) == "3.1"
 
     def test_fformat_custom_places(self):
         """Test fformat with custom decimal places."""
-        assert drawtree.fformat(3.14159, 2) == "3.14"
-        assert drawtree.fformat(3.14159, 0) == "3"
-        assert drawtree.fformat(3.14159, 5) == "3.14159"
+        assert draw_tree.fformat(3.14159, 2) == "3.14"
+        assert draw_tree.fformat(3.14159, 0) == "3"
+        assert draw_tree.fformat(3.14159, 5) == "3.14159"
 
     def test_coord(self):
         """Test coordinate pair formatting."""
-        assert drawtree.coord(1.0, 2.0) == "(1,2)"
-        assert drawtree.coord(3.14, 2.71) == "(3.14,2.71)"
-        assert drawtree.coord(-1.5, 0.0) == "(-1.5,0)"
+        assert draw_tree.coord(1.0, 2.0) == "(1,2)"
+        assert draw_tree.coord(3.14, 2.71) == "(3.14,2.71)"
+        assert draw_tree.coord(-1.5, 0.0) == "(-1.5,0)"
 
     def test_twonorm(self):
         """Test Euclidean length calculation."""
-        assert drawtree.twonorm([3, 4]) == 5.0
-        assert drawtree.twonorm([1, 0]) == 1.0
-        assert drawtree.twonorm([0, 0]) == 0.0
+        assert draw_tree.twonorm([3, 4]) == 5.0
+        assert draw_tree.twonorm([1, 0]) == 1.0
+        assert draw_tree.twonorm([0, 0]) == 0.0
 
     def test_aeq(self):
         """Test almost equal comparison."""
-        assert drawtree.aeq(1e-10, 0)  # Very small number should be considered zero
-        assert drawtree.aeq(1.0, 1.0)
-        assert not drawtree.aeq(1.0, 2.0)
-        assert drawtree.aeq(1.0, 1.0 + 1e-10)  # Numbers within epsilon should be equal
+        assert draw_tree.aeq(1e-10, 0)  # Very small number should be considered zero
+        assert draw_tree.aeq(1.0, 1.0)
+        assert not draw_tree.aeq(1.0, 2.0)
+        assert draw_tree.aeq(1.0, 1.0 + 1e-10)  # Numbers within epsilon should be equal
 
     def test_degrees(self):
         """Test angle calculation in degrees."""
         import math
-        assert abs(drawtree.degrees([1, 0]) - 0) < 1e-6
-        assert abs(drawtree.degrees([0, 1]) - 90) < 1e-6
-        assert abs(drawtree.degrees([-1, 0]) - 180) < 1e-6
-        assert abs(drawtree.degrees([0, -1]) - (-90)) < 1e-6
+        assert abs(draw_tree.degrees([1, 0]) - 0) < 1e-6
+        assert abs(draw_tree.degrees([0, 1]) - 90) < 1e-6
+        assert abs(draw_tree.degrees([-1, 0]) - 180) < 1e-6
+        assert abs(draw_tree.degrees([0, -1]) - (-90)) < 1e-6
 
     def test_stretch(self):
         """Test vector stretching to desired length."""
-        result = drawtree.stretch([3, 4], 10)
-        assert abs(drawtree.twonorm(result) - 10) < 1e-6
+        result = draw_tree.stretch([3, 4], 10)
+        assert abs(draw_tree.twonorm(result) - 10) < 1e-6
         assert abs(result[0] - 6) < 1e-6
         assert abs(result[1] - 8) < 1e-6
 
     def test_det(self):
         """Test determinant calculation."""
-        assert drawtree.det(1, 2, 3, 4) == (1 * 4 - 2 * 3)
-        assert drawtree.det(2, 0, 0, 3) == 6
+        assert draw_tree.det(1, 2, 3, 4) == (1 * 4 - 2 * 3)
+        assert draw_tree.det(2, 0, 0, 3) == 6
 
 
 class TestStringParsing:
@@ -75,16 +75,16 @@ class TestStringParsing:
 
     def test_splitnumtext_basic(self):
         """Test basic number-text splitting."""
-        assert drawtree.splitnumtext("2a") == (2.0, "a")
-        assert drawtree.splitnumtext(".3xyz") == (0.3, "xyz")
-        assert drawtree.splitnumtext("a") == (1, "a")
-        assert drawtree.splitnumtext("22.2xyz") == (22.2, "xyz")
+        assert draw_tree.splitnumtext("2a") == (2.0, "a")
+        assert draw_tree.splitnumtext(".3xyz") == (0.3, "xyz")
+        assert draw_tree.splitnumtext("a") == (1, "a")
+        assert draw_tree.splitnumtext("22.2xyz") == (22.2, "xyz")
 
     def test_splitnumtext_edge_cases(self):
         """Test edge cases for number-text splitting."""
-        assert drawtree.splitnumtext("") == (1, "")
-        assert drawtree.splitnumtext("123") == (123.0, "")
-        assert drawtree.splitnumtext(".") == (1, "")
+        assert draw_tree.splitnumtext("") == (1, "")
+        assert draw_tree.splitnumtext("123") == (123.0, "")
+        assert draw_tree.splitnumtext(".") == (1, "")
 
 
 class TestNodeOperations:
@@ -92,18 +92,18 @@ class TestNodeOperations:
 
     def test_setnodeid(self):
         """Test node ID creation."""
-        assert drawtree.setnodeid(1.0, "test") == "1,test"
-        assert drawtree.setnodeid(0.5, "node") == "0.5,node"
+        assert draw_tree.setnodeid(1.0, "test") == "1,test"
+        assert draw_tree.setnodeid(0.5, "node") == "0.5,node"
 
     def test_cleannodeid(self):
         """Test node ID standardization."""
         # Mock the error function to avoid output during tests
-        with patch('drawtree.error'):
-            assert drawtree.cleannodeid("1,test") == "1,test"
-            assert drawtree.cleannodeid("0.5,node") == "0.5,node"
+        with patch('draw_tree.core.error'):
+            assert draw_tree.cleannodeid("1,test") == "1,test"
+            assert draw_tree.cleannodeid("0.5,node") == "0.5,node"
             # Test error cases
-            drawtree.cleannodeid("invalid")  # Should handle gracefully
-            drawtree.cleannodeid("x,test")  # Invalid level
+            draw_tree.cleannodeid("invalid")  # Should handle gracefully
+            draw_tree.cleannodeid("x,test")  # Invalid level
 
 
 class TestOutputRoutines:
@@ -113,19 +113,19 @@ class TestOutputRoutines:
         """Test output stream printing."""
         test_stream = ["line1", "line2", "line3"]
         with patch('builtins.print') as mock_print:
-            drawtree.outall(test_stream)
+            draw_tree.outall(test_stream)
             assert mock_print.call_count == 3
 
     def test_outs(self):
         """Test single string output."""
         test_stream = []
-        drawtree.outs("test", test_stream)
+        draw_tree.outs("test", test_stream)
         assert test_stream == ["test"]
 
     def test_comment(self):
         """Test comment output."""
-        with patch('drawtree.outs') as mock_outs:
-            drawtree.comment("test comment")
+        with patch('draw_tree.core.outs') as mock_outs:
+            draw_tree.comment("test comment")
             mock_outs.assert_called_with("%% test comment")
 
 
@@ -142,7 +142,7 @@ class TestFileOperations:
             temp_filename = f.name
 
         try:
-            result = drawtree.readfile(temp_filename)
+            result = draw_tree.readfile(temp_filename)
             expected = ["line 1", "line 2 with spaces", "line 3"]
             assert result == expected
         finally:
@@ -151,7 +151,7 @@ class TestFileOperations:
     def test_readfile_nonexistent(self):
         """Test file reading with non-existent file."""
         with pytest.raises(FileNotFoundError):
-            drawtree.readfile("nonexistent_file.txt")
+            draw_tree.readfile("nonexistent_file.txt")
 
 
 class TestCommandLineProcessing:
@@ -159,44 +159,44 @@ class TestCommandLineProcessing:
 
     def test_commandline_scale(self):
         """Test scale argument processing."""
-        original_scale = drawtree.scale
+        original_scale = draw_tree.scale
         try:
-            drawtree.commandline(["drawtree.py", "scale=2.5"])
-            assert drawtree.scale == 2.5
+            draw_tree.commandline(["draw_tree.py", "scale=2.5"])
+            assert draw_tree.scale == 2.5
         finally:
-            drawtree.scale = original_scale
+            draw_tree.scale = original_scale
 
     def test_commandline_grid(self):
         """Test grid argument processing."""
-        original_grid = drawtree.grid
+        original_grid = draw_tree.grid
         try:
-            drawtree.commandline(["drawtree.py", "grid"])
-            assert drawtree.grid is True
+            draw_tree.commandline(["draw_tree.py", "grid"])
+            assert draw_tree.grid is True
         finally:
-            drawtree.grid = original_grid
+            draw_tree.grid = original_grid
 
     def test_commandline_file(self):
         """Test file argument processing."""
-        original_ef_file = getattr(drawtree, 'ef_file', None)
+        original_ef_file = getattr(draw_tree, 'ef_file', None)
         try:
-            drawtree.commandline(["drawtree.py", "test_game.ef"])
-            assert drawtree.ef_file == "test_game.ef"
+            draw_tree.commandline(["draw_tree.py", "test_game.ef"])
+            assert draw_tree.ef_file == "test_game.ef"
         finally:
             if original_ef_file is not None:
-                drawtree.ef_file = original_ef_file
+                draw_tree.ef_file = original_ef_file
 
     def test_commandline_invalid_scale(self):
         """Test invalid scale argument handling."""
-        original_scale = drawtree.scale
+        original_scale = draw_tree.scale
         try:
-            with patch('drawtree.outs') as mock_outs:
-                drawtree.commandline(["drawtree.py", "scale=invalid"])
+            with patch('draw_tree.core.outs') as mock_outs:
+                draw_tree.commandline(["draw_tree.py", "scale=invalid"])
                 # Should output error message
                 mock_outs.assert_called()
                 # Scale should remain unchanged
-                assert drawtree.scale == original_scale
+                assert draw_tree.scale == original_scale
         finally:
-            drawtree.scale = original_scale
+            draw_tree.scale = original_scale
 
 
 class TestPlayerHandling:
@@ -205,25 +205,25 @@ class TestPlayerHandling:
     def test_player_basic(self):
         """Test basic player parsing."""
         words = ["player", "1"]
-        with patch('drawtree.defout'):
-            p, advance = drawtree.player(words)
+        with patch('draw_tree.core.defout'):
+            p, advance = draw_tree.player(words)
             assert p == 1
             assert advance == 2
 
     def test_player_with_name(self):
         """Test player parsing with name."""
         words = ["player", "2", "name", "Alice"]
-        with patch('drawtree.defout'):
-            p, advance = drawtree.player(words)
+        with patch('draw_tree.core.defout'):
+            p, advance = draw_tree.player(words)
             assert p == 2
             assert advance == 4
-            assert drawtree.playername[2] == "Alice"
+            assert draw_tree.playername[2] == "Alice"
 
     def test_player_invalid_number(self):
         """Test player parsing with invalid number."""
         words = ["player", "invalid"]
-        with patch('drawtree.error') as mock_error:
-            p, advance = drawtree.player(words)
+        with patch('draw_tree.core.error') as mock_error:
+            p, advance = draw_tree.player(words)
             assert p == -1
             mock_error.assert_called()
 
@@ -234,18 +234,18 @@ class TestGeometryFunctions:
     def test_isonlineseg_basic(self):
         """Test point-on-line-segment detection."""
         # Point on line segment
-        assert drawtree.isonlineseg([0, 0], [1, 1], [2, 2]) is True
+        assert draw_tree.isonlineseg([0, 0], [1, 1], [2, 2]) is True
         # Point on line segment (slope 2)
-        assert drawtree.isonlineseg([0, 0], [1, 2], [2, 4]) is True
+        assert draw_tree.isonlineseg([0, 0], [1, 2], [2, 4]) is True
         # Point not on line segment
-        assert drawtree.isonlineseg([0, 0], [1, 3], [2, 4]) is False
+        assert draw_tree.isonlineseg([0, 0], [1, 3], [2, 4]) is False
         # Point at endpoint
-        assert drawtree.isonlineseg([0, 0], [0, 0], [1, 1]) is True
+        assert draw_tree.isonlineseg([0, 0], [0, 0], [1, 1]) is True
 
     def test_makearc_basic(self):
         """Test arc generation."""
         # Test with simple coordinates
-        result = drawtree.makearc([0, 0], [1, 0], [2, 0])
+        result = draw_tree.makearc([0, 0], [1, 0], [2, 0])
         assert isinstance(result, str)
         assert "arc(" in result
 
@@ -263,7 +263,7 @@ class TestDrawTreeFunction:
             ef_file_path = ef_file.name
 
         try:
-            result = drawtree.draw_tree(ef_file_path)
+            result = draw_tree.draw_tree(ef_file_path)
             
             # Verify the result contains expected components
             assert isinstance(result, str)
@@ -292,15 +292,15 @@ class TestDrawTreeFunction:
 
         try:
             # Test with scale
-            result_scaled = drawtree.draw_tree(ef_file_path, scale_factor=2.0)
+            result_scaled = draw_tree.draw_tree(ef_file_path, scale_factor=2.0)
             assert "scale=2" in result_scaled
             
             # Test with grid
-            result_grid = drawtree.draw_tree(ef_file_path, show_grid=True)
+            result_grid = draw_tree.draw_tree(ef_file_path, show_grid=True)
             assert "\\draw [help lines, color=green]" in result_grid
             
             # Test without grid (default)
-            result_no_grid = drawtree.draw_tree(ef_file_path, show_grid=False)
+            result_no_grid = draw_tree.draw_tree(ef_file_path, show_grid=False)
             assert "% \\draw [help lines, color=green]" in result_no_grid
             
         finally:
@@ -310,7 +310,7 @@ class TestDrawTreeFunction:
         """Test draw_tree with missing files."""
         # Test with missing .ef file
         with pytest.raises(FileNotFoundError):
-            drawtree.draw_tree("nonexistent.ef")
+            draw_tree.draw_tree("nonexistent.ef")
 
         # Test with valid .ef file (should work with built-in macros)
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
@@ -318,7 +318,7 @@ class TestDrawTreeFunction:
             ef_file_path = ef_file.name
 
         try:
-            result = drawtree.draw_tree(ef_file_path)
+            result = draw_tree.draw_tree(ef_file_path)
             # Should work with built-in macros
             assert "\\begin{tikzpicture}" in result
             assert "\\newcommand\\chancecolor{red}" in result
@@ -332,9 +332,9 @@ class TestPngGeneration:
     def test_generate_png_missing_file(self):
         """Test PNG generation with missing .ef file."""
         with pytest.raises(FileNotFoundError):
-            drawtree.generate_png("nonexistent.ef")
+            draw_tree.generate_png("nonexistent.ef")
 
-    @patch('drawtree.subprocess.run')
+    @patch('draw_tree.core.subprocess.run')
     def test_generate_png_pdflatex_not_found(self, mock_run):
         """Test PNG generation when pdflatex is not available."""
         # Mock pdflatex not being found
@@ -347,7 +347,7 @@ class TestPngGeneration:
 
         try:
             with pytest.raises(RuntimeError, match="pdflatex not found"):
-                drawtree.generate_png(ef_file_path)
+                draw_tree.generate_png(ef_file_path)
         finally:
             os.unlink(ef_file_path)
 
@@ -360,11 +360,11 @@ class TestPngGeneration:
 
         try:
             # Mock both pdflatex and convert being unavailable to test error handling
-            with patch('drawtree.subprocess.run') as mock_run:
+            with patch('draw_tree.core.subprocess.run') as mock_run:
                 mock_run.side_effect = FileNotFoundError("Command not found")
                 
                 with pytest.raises(RuntimeError):
-                    drawtree.generate_png(ef_file_path)
+                    draw_tree.generate_png(ef_file_path)
         finally:
             os.unlink(ef_file_path)
 
@@ -377,11 +377,11 @@ class TestPngGeneration:
 
         try:
             # Test that custom DPI is handled properly
-            with patch('drawtree.subprocess.run') as mock_run:
+            with patch('draw_tree.core.subprocess.run') as mock_run:
                 mock_run.side_effect = FileNotFoundError("Command not found")
                 
                 with pytest.raises(RuntimeError):
-                    drawtree.generate_png(ef_file_path, dpi=600)
+                    draw_tree.generate_png(ef_file_path, dpi=600)
         finally:
             os.unlink(ef_file_path)
 
@@ -393,11 +393,11 @@ class TestPngGeneration:
             ef_file_path = ef_file.name
 
         try:
-            with patch('drawtree.subprocess.run') as mock_run:
+            with patch('draw_tree.core.subprocess.run') as mock_run:
                 mock_run.side_effect = FileNotFoundError("Command not found")
                 
                 with pytest.raises(RuntimeError):
-                    drawtree.generate_png(ef_file_path, output_png="custom_name.png")
+                    draw_tree.generate_png(ef_file_path, output_png="custom_name.png")
         finally:
             os.unlink(ef_file_path)
 
@@ -408,7 +408,7 @@ class TestTexGeneration:
     def test_generate_tex_missing_file(self):
         """Test LaTeX generation with missing .ef file."""
         with pytest.raises(FileNotFoundError):
-            drawtree.generate_tex("nonexistent.ef")
+            draw_tree.generate_tex("nonexistent.ef")
 
     def test_generate_tex_default_parameters(self):
         """Test LaTeX generation with default parameters."""
@@ -419,7 +419,7 @@ class TestTexGeneration:
 
         try:
             # Generate LaTeX file
-            tex_path = drawtree.generate_tex(ef_file_path)
+            tex_path = draw_tree.generate_tex(ef_file_path)
             
             # Verify the file was created and contains expected content
             assert os.path.exists(tex_path)
@@ -450,7 +450,7 @@ class TestTexGeneration:
 
         try:
             custom_filename = "custom_output.tex"
-            tex_path = drawtree.generate_tex(ef_file_path, output_tex=custom_filename)
+            tex_path = draw_tree.generate_tex(ef_file_path, output_tex=custom_filename)
             
             # Verify the custom filename was used
             assert tex_path.endswith(custom_filename)
@@ -470,7 +470,7 @@ class TestTexGeneration:
             ef_file_path = ef_file.name
 
         try:
-            tex_path = drawtree.generate_tex(ef_file_path, scale_factor=2.0, show_grid=True)
+            tex_path = draw_tree.generate_tex(ef_file_path, scale_factor=2.0, show_grid=True)
             
             # Verify the file was created
             assert os.path.exists(tex_path)
@@ -494,7 +494,7 @@ class TestCommandlineArguments:
 
     def test_commandline_png_flag(self):
         """Test --png flag parsing."""
-        result = drawtree.commandline(['drawtree.py', 'test.ef', '--png'])
+        result = draw_tree.commandline(['draw_tree.py', 'test.ef', '--png'])
         output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert output_mode == "png"
         assert not pdf_requested
@@ -505,7 +505,7 @@ class TestCommandlineArguments:
 
     def test_commandline_png_with_dpi(self):
         """Test --png flag with --dpi option."""
-        result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=600'])
+        result = draw_tree.commandline(['draw_tree.py', 'test.ef', '--png', '--dpi=600'])
         output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert output_mode == "png"
         assert not pdf_requested
@@ -516,7 +516,7 @@ class TestCommandlineArguments:
 
     def test_commandline_png_output_file(self):
         """Test PNG output with custom filename."""
-        result = drawtree.commandline(['drawtree.py', 'test.ef', '--output=custom.png'])
+        result = draw_tree.commandline(['draw_tree.py', 'test.ef', '--output=custom.png'])
         output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert output_mode == "png"
         assert not pdf_requested
@@ -527,7 +527,7 @@ class TestCommandlineArguments:
 
     def test_commandline_pdf_output_file(self):
         """Test PDF output with custom filename."""
-        result = drawtree.commandline(['drawtree.py', 'test.ef', '--output=custom.pdf'])
+        result = draw_tree.commandline(['draw_tree.py', 'test.ef', '--output=custom.pdf'])
         output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert output_mode == "pdf"
         assert pdf_requested
@@ -538,7 +538,7 @@ class TestCommandlineArguments:
 
     def test_commandline_tex_flag(self):
         """Test --tex flag parsing."""
-        result = drawtree.commandline(['drawtree.py', 'test.ef', '--tex'])
+        result = draw_tree.commandline(['draw_tree.py', 'test.ef', '--tex'])
         output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert output_mode == "tex"
         assert not pdf_requested
@@ -549,7 +549,7 @@ class TestCommandlineArguments:
 
     def test_commandline_tex_output_file(self):
         """Test LaTeX output with custom filename."""
-        result = drawtree.commandline(['drawtree.py', 'test.ef', '--output=custom.tex'])
+        result = draw_tree.commandline(['draw_tree.py', 'test.ef', '--output=custom.tex'])
         output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert output_mode == "tex"
         assert not pdf_requested
@@ -561,18 +561,18 @@ class TestCommandlineArguments:
     def test_commandline_invalid_dpi(self):
         """Test invalid DPI values."""
         # Too low DPI should default to 300
-        result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=50'])
+        result = draw_tree.commandline(['draw_tree.py', 'test.ef', '--png', '--dpi=50'])
         output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert dpi == 300  # Should default to 300 for out-of-range values
 
         # Too high DPI should default to 300
-        result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=5000'])
+        result = draw_tree.commandline(['draw_tree.py', 'test.ef', '--png', '--dpi=5000'])
         output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert dpi == 300  # Should default to 300 for out-of-range values
 
     def test_commandline_invalid_dpi_string(self):
         """Test non-numeric DPI values."""
-        result = drawtree.commandline(['drawtree.py', 'test.ef', '--png', '--dpi=high'])
+        result = draw_tree.commandline(['draw_tree.py', 'test.ef', '--png', '--dpi=high'])
         output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = result
         assert dpi == 300  # Should default to 300 for invalid values
 

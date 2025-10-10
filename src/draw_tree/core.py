@@ -1,7 +1,6 @@
-#!/usr/bin/python
 """
 Game tree drawing as TikZ file from .ef file
-Version 1.0.5
+Version 0.1.0
 
 This module provides functionality to generate TikZ code for game trees
 from extensive form (.ef) files, with support for Jupyter notebooks.
@@ -9,7 +8,6 @@ from extensive form (.ef) files, with support for Jupyter notebooks.
 from __future__ import annotations
 
 import sys
-import os
 import math
 import subprocess
 import tempfile
@@ -1289,20 +1287,20 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) 
 
     # Step 3: Combine everything into complete TikZ code
     tikz_code = """% TikZ code with built-in styling for game trees
-                % TikZ libraries required for game trees
-                \\usetikzlibrary{shapes}
-                \\usetikzlibrary{arrows.meta}
+% TikZ libraries required for game trees
+\\usetikzlibrary{shapes}
+\\usetikzlibrary{arrows.meta}
 
-                % Style settings for game tree formatting
-                \\tikzset{
-                    every node/.append style={font=\\rmfamily},
-                    every text node part/.append style={align=center},
-                    node distance=1.5mm,
-                    thick
-                }
+% Style settings for game tree formatting
+\\tikzset{
+    every node/.append style={font=\\rmfamily},
+    every text node part/.append style={align=center},
+    node distance=1.5mm,
+    thick
+}
 
-                % Built-in macro definitions for game tree drawing
-                """
+% Built-in macro definitions for game tree drawing
+"""
 
     # Add macro definitions
     for macro in macro_definitions:
@@ -1323,32 +1321,31 @@ def latex_wrapper(tikz_code: str) -> str:
     Returns:
         Complete LaTeX document as a string.
     """
-    latex_document = f"""
-                        \\documentclass[a4paper,12pt]{{article}}
-                        \\usepackage{{newpxtext,newpxmath}}
-                        \\linespread{{1.10}}        % Palatino needs more leading (space between lines) 
-                        \\usepackage{{graphicx}}
-                        \\usepackage{{tikz}}
-                        \\usetikzlibrary{{shapes}}
-                        \\usetikzlibrary{{arrows.meta}}
-                        \\oddsidemargin=.46cm 
-                        \\textwidth=15cm
-                        \\textheight=24cm
-                        \\topmargin=-1.3cm
-                        \\parindent 0pt
-                        \\parskip1ex
-                        \\pagestyle{{empty}}
+    latex_document = f"""\\documentclass[a4paper,12pt]{{article}}
+\\usepackage{{newpxtext,newpxmath}}
+\\linespread{{1.10}}        % Palatino needs more leading (space between lines) 
+\\usepackage{{graphicx}}
+\\usepackage{{tikz}}
+\\usetikzlibrary{{shapes}}
+\\usetikzlibrary{{arrows.meta}}
+\\oddsidemargin=.46cm 
+\\textwidth=15cm
+\\textheight=24cm
+\\topmargin=-1.3cm
+\\parindent 0pt
+\\parskip1ex
+\\pagestyle{{empty}}
 
-                        \\begin{{document}}
+\\begin{{document}}
 
-                        \\hrule
+\\hrule
 
-                        {tikz_code}
+{tikz_code}
 
-                        \\hrule
+\\hrule
 
-                        \\end{{document}}
-                    """
+\\end{{document}}
+"""
     return latex_document
 
 
@@ -1452,9 +1449,9 @@ def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: f
                 raise RuntimeError("PDF was not generated successfully")
                 
         except subprocess.CalledProcessError as e:
-            error_msg = f"LaTeX compilation failed:\\n{e.stderr}"
+            error_msg = f"LaTeX compilation failed:\n{e.stderr}"
             if "command not found" in e.stderr or "No such file" in str(e):
-                error_msg += "\\n\\nMake sure pdflatex is installed and available in your PATH."
+                error_msg += "\n\nMake sure pdflatex is installed and available in your PATH."
             raise RuntimeError(error_msg)
         except FileNotFoundError:
             raise RuntimeError("pdflatex not found. Please install a LaTeX distribution (e.g., TeX Live, MiKTeX).")
@@ -1587,102 +1584,3 @@ def generate_png(ef_file: str, output_png: Optional[str] = None, scale_factor: f
             raise
         except Exception as e:
             raise RuntimeError(f"PNG generation failed: {e}")
-######################## main
-
-if __name__ == "__main__":
-    # === STREAMLINED MAIN EXECUTION USING draw_tree(), generate_pdf(), OR generate_png() ===
-    # Initialize default file and process command-line arguments
-    ef_file = DEFAULTFILE
-    output_mode, pdf_requested, png_requested, tex_requested, output_file, dpi = commandline(sys.argv)
-    
-    # Display help if no arguments provided
-    if len(sys.argv) == 1:
-        print("DrawTree - Game tree drawing tool")
-        print()
-        print("Usage:")
-        print("  python drawtree.py <file.ef> [options]           # Generate TikZ code")
-        print("  python drawtree.py <file.ef> --pdf [options]     # Generate PDF (requires pdflatex)")
-        print("  python drawtree.py <file.ef> --png [options]     # Generate PNG (requires pdflatex + imagemagick/ghostscript)")
-        print("  python drawtree.py <file.ef> --tex [options]     # Generate LaTeX document")
-        print("  python drawtree.py <file.ef> --output=name.ext   # Generate with custom filename (.pdf, .png, or .tex)")
-        print()
-        print("Options:")
-        print("  scale=X.X    Set scale factor (0.01 to 100)")
-        print("  grid         Show helper grid")
-        print("  --pdf        Generate PDF output instead of TikZ")
-        print("  --png        Generate PNG output instead of TikZ")
-        print("  --tex        Generate LaTeX document instead of TikZ")
-        print("  --output=X   Specify output filename (.pdf, .png, or .tex extension determines format)")
-        print("  --dpi=X      Set PNG resolution in DPI (72-2400, default: 300)")
-        print()
-        print("Examples:")
-        print("  python drawtree.py games/example.ef --pdf")
-        print("  python drawtree.py games/example.ef --png --dpi=600")
-        print("  python drawtree.py games/example.ef --tex")
-        print("  python drawtree.py games/example.ef --output=mygame.tex scale=0.8")
-        print()
-        print("Note: PDF/PNG generation requires pdflatex. PNG also needs ImageMagick or Ghostscript.")
-        sys.exit(0)
-    
-    try:
-        if output_mode == "pdf":
-            print(f"Generating PDF: {output_file}")
-            pdf_path = generate_pdf(
-                ef_file=ef_file,
-                output_pdf=output_file,
-                scale_factor=scale,
-                show_grid=grid
-            )
-            print(f"PDF generated successfully: {pdf_path}")
-        
-        elif output_mode == "png":
-            # Use default PNG filename if none specified
-            if output_file is None:
-                base_name = os.path.splitext(os.path.basename(ef_file))[0]
-                output_file = f"{base_name}.png"
-            print(f"Generating PNG: {output_file}")
-            png_path = generate_png(
-                ef_file=ef_file,
-                output_png=output_file,
-                scale_factor=scale,
-                show_grid=grid,
-                dpi=dpi if dpi is not None else 300
-            )
-            print(f"PNG generated successfully: {png_path}")
-        
-        elif output_mode == "tex":
-            # Use default TEX filename if none specified
-            if output_file is None:
-                base_name = os.path.splitext(os.path.basename(ef_file))[0]
-                output_file = f"{base_name}.tex"
-            print(f"Generating LaTeX: {output_file}")
-            tex_path = generate_tex(
-                ef_file=ef_file,
-                output_tex=output_file,
-                scale_factor=scale,
-                show_grid=grid
-            )
-            print(f"LaTeX generated successfully: {tex_path}")
-        
-        else:
-            # Generate TikZ code (original behavior)
-            tikz_code = draw_tree(
-                ef_file=ef_file, 
-                scale_factor=scale, 
-                show_grid=grid
-            )
-            
-            # Output the complete TikZ code
-            print(tikz_code)
-        
-    except FileNotFoundError:
-        print(f"Error: Could not find file {ef_file}", file=sys.stderr)
-        print("Make sure the .ef file exists in the current directory", file=sys.stderr)
-        sys.exit(1)
-    except RuntimeError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error processing {ef_file}: {e}", file=sys.stderr)
-        sys.exit(1)
-
