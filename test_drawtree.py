@@ -262,14 +262,8 @@ class TestDrawTreeFunction:
             ef_file.write("level 1 node left from 0,root player 2 payoffs 1 2\n")
             ef_file_path = ef_file.name
 
-        # Create a simple macros file
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.tex') as macro_file:
-            macro_file.write("\\newcommand\\testmacro{value}\n")
-            macro_file.write("\\newdimen\\testdim\n")
-            macro_file_path = macro_file.name
-
         try:
-            result = drawtree.draw_tree(ef_file_path, macros_file_path=macro_file_path)
+            result = drawtree.draw_tree(ef_file_path)
             
             # Verify the result contains expected components
             assert isinstance(result, str)
@@ -278,12 +272,15 @@ class TestDrawTreeFunction:
             assert "\\usetikzlibrary{arrows.meta}" in result
             assert "\\begin{tikzpicture}" in result
             assert "\\end{tikzpicture}" in result
-            assert "\\newcommand\\testmacro{value}" in result
-            assert "\\newdimen\\testdim" in result
+            # Check for built-in macro definitions
+            assert "\\newcommand\\chancecolor{red}" in result
+            assert "\\newdimen\\ndiam" in result
+            assert "\\ndiam1.5mm" in result
+            assert "\\newdimen\\paydown" in result
+            assert "\\paydown2.5ex" in result
             
         finally:
             os.unlink(ef_file_path)
-            os.unlink(macro_file_path)
 
     def test_draw_tree_with_options(self):
         """Test draw_tree with different options."""
@@ -293,27 +290,21 @@ class TestDrawTreeFunction:
             ef_file.write("level 0 node root player 1\n")
             ef_file_path = ef_file.name
 
-        # Create a simple macros file
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.tex') as macro_file:
-            macro_file.write("\\newcommand\\testmacro{value}\n")
-            macro_file_path = macro_file.name
-
         try:
             # Test with scale
-            result_scaled = drawtree.draw_tree(ef_file_path, scale_factor=2.0, macros_file_path=macro_file_path)
+            result_scaled = drawtree.draw_tree(ef_file_path, scale_factor=2.0)
             assert "scale=2" in result_scaled
             
             # Test with grid
-            result_grid = drawtree.draw_tree(ef_file_path, show_grid=True, macros_file_path=macro_file_path)
+            result_grid = drawtree.draw_tree(ef_file_path, show_grid=True)
             assert "\\draw [help lines, color=green]" in result_grid
             
             # Test without grid (default)
-            result_no_grid = drawtree.draw_tree(ef_file_path, show_grid=False, macros_file_path=macro_file_path)
+            result_no_grid = drawtree.draw_tree(ef_file_path, show_grid=False)
             assert "% \\draw [help lines, color=green]" in result_no_grid
             
         finally:
             os.unlink(ef_file_path)
-            os.unlink(macro_file_path)
 
     def test_draw_tree_missing_files(self):
         """Test draw_tree with missing files."""
@@ -321,17 +312,16 @@ class TestDrawTreeFunction:
         with pytest.raises(FileNotFoundError):
             drawtree.draw_tree("nonexistent.ef")
 
-        # Test with missing macros file (should work but print warning)
+        # Test with valid .ef file (should work with built-in macros)
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
             ef_file.write("player 1\nlevel 0 node root player 1\n")
             ef_file_path = ef_file.name
 
         try:
-            with patch('builtins.print') as mock_print:
-                result = drawtree.draw_tree(ef_file_path, macros_file_path="nonexistent_macros.tex")
-                # Should still work but print warning
-                assert "\\begin{tikzpicture}" in result
-                mock_print.assert_called()
+            result = drawtree.draw_tree(ef_file_path)
+            # Should work with built-in macros
+            assert "\\begin{tikzpicture}" in result
+            assert "\\newcommand\\chancecolor{red}" in result
         finally:
             os.unlink(ef_file_path)
 

@@ -1251,7 +1251,7 @@ def ef_to_tex(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) 
         scale = original_scale
         grid = original_grid
 
-def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False, macros_file_path: str = "macros-drawtree.tex") -> str:
+def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
     """
     Generate complete TikZ code from an extensive form (.ef) file.
     
@@ -1259,7 +1259,6 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False, 
         ef_file: Path to the .ef file to process.
         scale_factor: Scale factor for the diagram (default: 1.0).
         show_grid: Whether to show grid lines (default: False).
-        macros_file_path: Path to the macros file (default: "macros-drawtree.tex").
         
     Returns:
         Complete TikZ code ready for use in Jupyter notebooks or LaTeX documents.
@@ -1267,29 +1266,34 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False, 
     # Step 1: Generate the tikzpicture content using ef_to_tex logic
     tikz_picture_content = ef_to_tex(ef_file, scale_factor, show_grid)
     
-    # Step 2: Read and process the macros file
-    try:
-        with open(macros_file_path, "r") as f:
-            macros_content = f.read()
-    except FileNotFoundError:
-        print(f"Warning: Could not find macros file {macros_file_path}")
-        macros_content = ""
+    # Step 2: Define built-in macro definitions (from macros-drawtree.tex)
+    macro_definitions = [
+        "\\newcommand\\chancecolor{red}",
+        "\\newdimen\\ndiam",
+        "\\ndiam1.5mm",
+        "\\newdimen\\sqwidth", 
+        "\\sqwidth1.6mm",
+        "\\newdimen\\spx",
+        "\\spx.7mm",
+        "\\newdimen\\spy",
+        "\\spy.5mm",
+        "\\newdimen\\yup",
+        "\\yup0.5mm",
+        "\\newdimen\\yfracup",
+        "\\yfracup1mm",
+        "\\newdimen\\paydown",
+        "\\paydown2.5ex",
+        "\\newdimen\\treethickn",
+        "\\treethickn1pt"
+    ]
 
-    # Step 3: Extract macro definitions from the macros file
-    macro_lines = []
-    for line in macros_content.split("\n"):
-        line = line.strip()
-        if line and not line.startswith("%"):
-            macro_lines.append(line)
-
-    # Step 4: Combine everything into complete TikZ code
-    tikz_code = """
-                % TikZ code with q.tex styling using TikZ style definitions
+    # Step 3: Combine everything into complete TikZ code
+    tikz_code = """% TikZ code with built-in styling for game trees
                 % TikZ libraries required for game trees
                 \\usetikzlibrary{shapes}
                 \\usetikzlibrary{arrows.meta}
 
-                % Style settings to approximate q.tex formatting
+                % Style settings for game tree formatting
                 \\tikzset{
                     every node/.append style={font=\\rmfamily},
                     every text node part/.append style={align=center},
@@ -1297,11 +1301,11 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False, 
                     thick
                 }
 
-                % Macro definitions from macros-drawtree.tex
+                % Built-in macro definitions for game tree drawing
                 """
 
     # Add macro definitions
-    for macro in macro_lines:
+    for macro in macro_definitions:
         tikz_code += macro + "\n"
 
     tikz_code += f"\n% Game tree content from {ef_file}\n"
@@ -1665,8 +1669,7 @@ if __name__ == "__main__":
             tikz_code = draw_tree(
                 ef_file=ef_file, 
                 scale_factor=scale, 
-                show_grid=grid,
-                macros_file_path="macros-drawtree.tex"
+                show_grid=grid
             )
             
             # Output the complete TikZ code
