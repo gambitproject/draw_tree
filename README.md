@@ -4,9 +4,11 @@ Game tree drawing tool for extensive form games that generates TikZ code, LaTeX 
 
 ## Installation
 
-Install the package using pip:
+Clone the repo and install the package using pip:
 
 ```bash
+git clone https://github.com/gambitproject/draw_tree
+cd draw_tree
 pip install -e .
 ```
 
