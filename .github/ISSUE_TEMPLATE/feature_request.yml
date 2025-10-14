@@ -1,5 +1,5 @@
 name: Feature Request
-description: Suggest a new feature or improvement to the Gambit software.
+description: Suggest a new feature or improvement for draw_tree.
 labels: ["enhancement"]
 body:
   - type: markdown
