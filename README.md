@@ -14,7 +14,7 @@ pip install -e .
 
 ## Requirements
 
-- Python 3.7+ (tested on 3.13)
+- Python 3.9+ (tested on 3.13)
 - LaTeX with TikZ (for PDF/PNG generation)
 - (optional) ImageMagick or Ghostscript or Poppler (for PNG generation)
 
