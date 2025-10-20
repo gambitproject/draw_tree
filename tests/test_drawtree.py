@@ -579,3 +579,36 @@ class TestCommandlineArguments:
 
 if __name__ == "__main__":
     pytest.main([__file__])
+
+
+def test_efg_to_ef_conversion_example():
+    """Integration test: convert the provided one_card_poker.efg to .ef and compare."""
+    # Paths in the repository
+    efg_path = os.path.join('games', 'efg', 'one_card_poker.efg')
+    expected_ef_path = os.path.join('games', 'one_card_poker.ef')
+
+    # Run converter
+    out = draw_tree.efg_to_ef(efg_path)
+
+    # The function returns the output path when successful; read that file
+    if os.path.exists(out):
+        with open(out, 'r', encoding='utf-8') as f:
+            generated = f.read().strip().splitlines()
+    else:
+        # If it returned content, use it directly
+        generated = out.strip().splitlines()
+
+    # Read expected
+    with open(expected_ef_path, 'r', encoding='utf-8') as f:
+        _expected = f.read().strip().splitlines()
+
+    # Normalize lines: strip trailing spaces
+    gen_norm = [line.strip() for line in generated if line.strip()]
+    # (expected file read for reference if needed)
+
+    # Require exact line-by-line equality with the expected .ef file.
+    # Normalize both to stripped lines for comparison.
+    expected_lines = [ln.strip() for ln in _expected if ln.strip()]
+    assert gen_norm == expected_lines, (
+        "Generated .ef does not match expected.\nGenerated:\n" + "\n".join(gen_norm) + "\n\nExpected:\n" + "\n".join(expected_lines)
+    )
