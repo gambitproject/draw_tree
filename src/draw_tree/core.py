@@ -1591,19 +1591,24 @@ def efg_to_ef(efg_file: str) -> str:
     Convert a Gambit .efg (Extensive Form Game) file to the simple
     `.ef` format consumed by draw_tree.
 
-    This function implements a conservative parser for the subset of the
-    EFG syntax used in the provided One Card Poker example. It returns the
-    generated `.ef` content as a string (one line per `.ef` directive).
+        This function implements a conservative parser for the subset of the
+        EFG syntax used in the One Card Poker example included with the repo.
 
-    Limitations / assumptions (sufficient for the example):
-    - Players are declared with the EFG header line containing the names
-      in quotes after the R token: `EFG 2 R "Title" { "Alice" "Bob" }`.
-    - Chance nodes are given as lines starting with `c` and include
-      probabilities and moves in the same line.
-    - Player decision nodes start with `p` and include moves in braces.
-    - Terminal nodes start with `t` and include payoff lists.
-    - The function will not fully support every EFG feature, but will
-      correctly convert files with structure similar to the attached example.
+        It converts EFG records (lines beginning with 'c', 'p', 't') into the
+        simplified `.ef` directives read by draw_tree. The converter is
+        intentionally conservative and tuned to match the canonical example's
+        layout (levels and xshift magnitudes). It does not implement the full
+        Gambit EFG spec.
+
+        Supported EFG features (for now):
+        - Header with player names in braces: `{ "Alice" "Bob" }`.
+        - Chance nodes (`c`) with quoted move names and probabilities.
+        - Player decision nodes (`p`) with quoted move names.
+        - Terminal nodes (`t`) with payoff lists in braces.
+
+        The converter focuses on producing deterministic `.ef` output for
+        small, textbook examples. If you need broader EFG coverage, we can
+        extend the parser and layout rules in follow-up work.
 
     Args:
         efg_file: Path to the .efg file to convert.
@@ -1729,12 +1734,12 @@ def efg_to_ef(efg_file: str) -> str:
 
     collect_leaves(root)
     # spacing unit chosen to resemble original layout
+    # Define base unit up-front so it exists whether there are multiple leaves
+    BASE_LEAF_UNIT = 3.58
     if len(leaves) > 1:
-        # Use leaf spacing that produces the expected level-2 xshifts.
-        unit = 3.58
-        total = (len(leaves) - 1) * unit
+        total = (len(leaves) - 1) * BASE_LEAF_UNIT
         for i, leaf in enumerate(leaves):
-            leaf.x = -total / 2 + i * unit
+            leaf.x = -total / 2 + i * BASE_LEAF_UNIT
     else:
         leaves[0].x = 0.0
 
@@ -1748,8 +1753,9 @@ def efg_to_ef(efg_file: str) -> str:
     set_internal_x(root)
 
     # Step 5: assign levels based on parent-child relations. This reproduces
-    # the pattern in the canonical file: root at 0, chance->player children at
-    # +2, player->terminal at +2, player->player (decision after a move) at +4.
+    # the pattern in the canonical file: root at 0, root's immediate outcomes
+    # at +2, and internal decision nodes one level deeper (+4 from parent)
+    # to make room for their child terminals.
     root.level = 0
     def assign_levels_parent_relative(n):
         for c in n.children:
@@ -1766,16 +1772,15 @@ def efg_to_ef(efg_file: str) -> str:
     assign_levels_parent_relative(root)
 
     # Compute an emission scale so the produced xshift magnitudes match the
-    # canonical example. We measure the maximum absolute child offset from the
-    # root and scale it so that the top-level child xshift equals 3.58 (the
-    # value used in the expected .ef file). This gives deterministic numeric
-    # output that aligns with the reference.
+    # canonical example. Measure the maximum absolute child offset from the
+    # root and scale it so that the top-level child xshift equals
+    # BASE_LEAF_UNIT (3.58). This gives deterministic numeric output.
     emit_scale = 1.0
     try:
         if root.children:
             max_offset = max(abs(c.x - root.x) for c in root.children)
             if max_offset > 1e-9:
-                emit_scale = 3.58 / max_offset
+                emit_scale = BASE_LEAF_UNIT / max_offset
     except Exception:
         emit_scale = 1.0
 
@@ -1853,7 +1858,6 @@ def efg_to_ef(efg_file: str) -> str:
                 # If parent is at level 2 and child is an internal decision,
                 # canonical file uses a specific horizontal offset (~4.18).
                 if getattr(n, 'level', None) == 2 and c.children:
-                    sign = '-' if base < 0 else ''
                     xshift = 4.18 if base > 0 else -4.18
                     xs = f"{xshift:.2f}"
                 # Include player only for top-level (level 2) children.
