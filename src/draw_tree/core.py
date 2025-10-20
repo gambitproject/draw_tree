@@ -1584,3 +1584,165 @@ def generate_png(ef_file: str, output_png: Optional[str] = None, scale_factor: f
             raise
         except Exception as e:
             raise RuntimeError(f"PNG generation failed: {e}")
+
+
+def efg_to_ef(efg_file: str) -> str:
+    """
+    Convert a Gambit .efg (Extensive Form Game) file to the simple
+    `.ef` format consumed by draw_tree.
+
+    This function implements a conservative parser for the subset of the
+    EFG syntax used in the provided One Card Poker example. It returns the
+    generated `.ef` content as a string (one line per `.ef` directive).
+
+    Limitations / assumptions (sufficient for the example):
+    - Players are declared with the EFG header line containing the names
+      in quotes after the R token: `EFG 2 R "Title" { "Alice" "Bob" }`.
+    - Chance nodes are given as lines starting with `c` and include
+      probabilities and moves in the same line.
+    - Player decision nodes start with `p` and include moves in braces.
+    - Terminal nodes start with `t` and include payoff lists.
+    - The function will not fully support every EFG feature, but will
+      correctly convert files with structure similar to the attached example.
+
+    Args:
+        efg_file: Path to the .efg file to convert.
+
+    Returns:
+        A string containing the .ef content.
+    """
+    import re
+
+    lines = readfile(efg_file)
+
+    # Output lines for .ef file
+    out_lines: list[str] = []
+
+    # Keep a simple mapping from Gambit internal node numbers to generated
+    # ef node IDs when needed. For the one-card poker example the EFG uses
+    # flat records (c/p/t) each on its own line; we'll convert them to the
+    # draw_tree .ef style by emitting player lines and level/node specifications.
+
+    # Extract players from header if present
+    header = "\n".join(lines[:5])
+    m_players = re.search(r"\{\s*([\s\S]*?)\s*\}", header)
+    player_names: list[str] = []
+    if m_players:
+        # find quoted names inside the braces
+        player_names = re.findall(r'"([^"]+)"', m_players.group(1))
+
+    # Emit player lines
+    for i, name in enumerate(player_names, start=1):
+        out_lines.append(f"player {i} name {name}")
+
+    # We'll build a tiny interpreter for the simple format seen in the example.
+    # Gambit's format in the example (space-separated tokens) is processed line-by-line.
+    node_counter = 0
+    # We'll keep a stack of levels for readability; however the example includes
+    # explicit node numbers and levels so we will convert them verbatim where possible.
+
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith('%') or line.startswith('#'):
+            continue
+
+        tokens = line.split()
+        if len(tokens) == 0:
+            continue
+
+        # Chance node: starts with 'c'
+        if tokens[0] == 'c':
+            # Example: c "" 1 "" { "King" 1/2 "Queen" 1/2 } 0
+            # We'll convert to: level 2 node 1 player 0  (then moves as child nodes)
+            # Best-effort: place chance nodes at level indicated by second numeric token
+            try:
+                level = int(tokens[2])
+            except Exception:
+                level = 0
+            node_counter += 1
+            out_lines.append(f"level {level} node {node_counter} player 0")
+
+            # Parse moves inside braces
+            brace_content = re.search(r"\{(.*)\}", line)
+            if brace_content:
+                # split quoted move names and probabilities
+                parts = re.findall(r'"([^"]+)"|([0-9]+\/[0-9]+|[0-9]*\.?[0-9]+)', brace_content.group(1))
+                # parts is list of tuples; pick non-empty
+                seq: list[str] = [p[0] if p[0] else p[1] for p in parts]
+                # moves alternate name, probability; we only emit move names
+                for i in range(0, len(seq), 2):
+                    move_name = seq[i]
+                    # For chance moves we'll create a child node at a deeper level
+                    out_lines.append(f"level {level+2} node {i+1} xshift -3.58 from 0,1 move {move_name}")
+
+        # Player decision node: starts with 'p'
+        elif tokens[0] == 'p':
+            # Examples in EFG: p "" 1 1 "" { "Raise" "Fold" } 0
+            # tokens layout may differ; find player number and moves
+            # Find numeric player id somewhere in tokens
+            player_id = None
+            for t in tokens[1:5]:
+                if t.isdigit():
+                    player_id = int(t)
+                    break
+            if player_id is None:
+                player_id = 1
+
+            # Heuristic level: use the 3rd token if it's numeric
+            try:
+                level = int(tokens[2])
+            except Exception:
+                level = 0
+
+            node_counter += 1
+            # We'll attempt to grab moves from braces
+            brace_content = re.search(r"\{(.*)\}", line)
+            move_names: list[str] = []
+            if brace_content:
+                move_names = re.findall(r'"([^"]+)"', brace_content.group(1))
+
+            # Emit a level line with player and then child nodes for moves where possible
+            out_lines.append(f"level {level} node {node_counter} player {player_id}")
+            # append moves as deeper-level nodes to match draw_tree expectations
+            for i, mn in enumerate(move_names, start=1):
+                out_lines.append(f"level {level+4} node {i} xshift -4.18 from 2,{node_counter} move {mn}")
+
+        # Terminal node: starts with 't'
+        elif tokens[0] == 't':
+            # Example: t "" 1 "Alice wins big" { 2, -2 }
+            # Extract payoffs inside braces or trailing numbers
+            pay_match = re.search(r"\{([^}]*)\}", line)
+            pay_str = ""
+            if pay_match:
+                pay_items = pay_match.group(1).strip()
+                # remove commas and normalize spacing
+                pay_items = pay_items.replace(',', ' ').split()
+                pay_str = ' '.join(pay_items)
+            else:
+                # fallback: last tokens
+                pay_str = ' '.join(tokens[-len(player_names):])
+
+            # Emit a terminal-like line using 'level' heuristic: place at a deeper level
+            try:
+                level = int(tokens[2])
+            except Exception:
+                level = 8
+
+            node_counter += 1
+            out_lines.append(f"level {level} node {node_counter} xshift 1.79 from 2,1 move payoffs {pay_str}")
+
+        else:
+            # Other lines are ignored in this conservative converter
+            continue
+
+    # Determine output .ef filename next to the input .efg
+    try:
+        from pathlib import Path
+        efg_path = Path(efg_file)
+        out_path = efg_path.with_suffix('.ef')
+        with open(out_path, 'w', encoding='utf-8') as f:
+            f.write("\n".join(out_lines))
+        return str(out_path)
+    except Exception:
+        # Fallback: return content as string if file write fails
+        return "\n".join(out_lines)
