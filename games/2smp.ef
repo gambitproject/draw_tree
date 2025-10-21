@@ -1,8 +1,8 @@
 player 1 name Player~1
 player 2 name Player~2
 level 0 node 1 player 1
-level 2 node 1 player 2 xshift -3.58 from 0,1 move H
-level 2 node 2 player 2 xshift 3.58 from 0,1 move T
+level 2 node 1 xshift -3.58 from 0,1 move H
+level 2 node 2 xshift 3.58 from 0,1 move T
 level 6 node 1 player 1 xshift -1.9 from 2,2 move H
 level 6 node 2 player 1 xshift 1.9 from 2,2 move T
 level 10 node 1 xshift -0.90 from 6,2 move H
