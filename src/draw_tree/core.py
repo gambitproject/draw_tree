@@ -11,6 +11,7 @@ import sys
 import math
 import subprocess
 import tempfile
+import re
 
 from pathlib import Path
 from typing import List, Optional 
@@ -1600,7 +1601,6 @@ def efg_to_ef(efg_file: str) -> str:
     Returns:
         Path to the written `.ef` file as a string.
     """
-    import re
 
     lines = readfile(efg_file)
 
