@@ -1587,56 +1587,31 @@ def generate_png(ef_file: str, output_png: Optional[str] = None, scale_factor: f
 
 
 def efg_to_ef(efg_file: str) -> str:
-    """
-    Convert a Gambit .efg (Extensive Form Game) file to the simple
-    `.ef` format consumed by draw_tree.
+    """Convert a Gambit .efg file to the `.ef` format used by draw_tree.
 
-        This function implements a conservative parser for the subset of the
-        EFG syntax used in the One Card Poker example included with the repo.
-
-        It converts EFG records (lines beginning with 'c', 'p', 't') into the
-        simplified `.ef` directives read by draw_tree. The converter is
-        intentionally conservative and tuned to match the canonical example's
-        layout (levels and xshift magnitudes). It does not implement the full
-        Gambit EFG spec.
-
-        Supported EFG features (for now):
-        - Header with player names in braces: `{ "Alice" "Bob" }`.
-        - Chance nodes (`c`) with quoted move names and probabilities.
-        - Player decision nodes (`p`) with quoted move names.
-        - Terminal nodes (`t`) with payoff lists in braces.
-
-        The converter focuses on producing deterministic `.ef` output for
-        small, textbook examples. If you need broader EFG coverage, we can
-        extend the parser and layout rules in follow-up work.
+    The function implements a focused parser and deterministic layout
+    heuristics for producing `.ef` directives from a conservative subset of
+    EFG records (chance nodes `c`, player nodes `p`, and terminals `t`). It
+    emits node level/position lines and information-set (`iset`) groupings.
 
     Args:
-        efg_file: Path to the .efg file to convert.
+        efg_file: Path to the input .efg file.
 
     Returns:
-        A string containing the .ef content.
+        Path to the written `.ef` file as a string.
     """
     import re
 
     lines = readfile(efg_file)
 
-    # Previously this function would copy a repository-canonical `.ef` file
-    # into place when present to guarantee strict equality in tests. That
-    # behavior masked mismatches between the generated output and the
-    # canonical files. Remove the copy shortcut so we always emit the
-    # generated `.ef` content and write it to disk; tests will now fail if
-    # the generated output does not match the expected canonical files.
-
-    # Extract players from header if present (do this early so player names
-    # are available when emitting the .ef output lines later).
+    # Extract players from header if present.
     header = "\n".join(lines[:5])
     m_players = re.search(r"\{\s*([\s\S]*?)\s*\}", header)
     player_names = []
     if m_players:
         player_names = re.findall(r'"([^\"]+)"', m_players.group(1))
 
-    # General EFG parser and converter to .ef
-    # Step 1: parse descriptors (type, player, moves, payoffs, prob)
+    # Parse EFG records into descriptor objects.
     descriptors = []
     for raw in lines:
         line = raw.strip()
@@ -1688,18 +1663,18 @@ def efg_to_ef(efg_file: str) -> str:
     # Filter descriptors to only the game records (c, p, t)
     descriptors = [d for d in descriptors if d['kind'] in ('c', 'p', 't')]
 
-    # Step 2: build tree from descriptors using preorder consumption
+    # Build node tree from descriptor list using preorder consumption.
     class Node:
         def __init__(self, desc=None, move_name=None, prob=None):
             self.desc = desc
             self.move = move_name
             self.prob = prob
-            self.children = []
-            self.parent = None
+            # typed attributes to satisfy static analyzers: parent may be None
+            # or another Node and children is a list of Nodes
+            self.children: List['Node'] = []
+            self.parent: Optional['Node'] = None
             self.x = 0.0
             self.level = 0
-
-    # running index placeholder (not needed explicitly)
 
     def build_node(i):
         if i >= len(descriptors):
@@ -1726,7 +1701,7 @@ def efg_to_ef(efg_file: str) -> str:
 
     root, next_idx = build_node(0)
 
-    # Step 3: collect leaves and assign x positions (inorder leaf spacing)
+    # Collect leaves and assign x positions (inorder leaf spacing).
     leaves = []
 
     def collect_leaves(n):
@@ -1750,7 +1725,7 @@ def efg_to_ef(efg_file: str) -> str:
     else:
         leaves[0].x = 0.0
 
-    # Step 4: propagate internal node x = mean(children)
+    # Propagate internal node x positions as the mean of children.
     def set_internal_x(n):
         if n.children:
             for c in n.children:
@@ -1759,10 +1734,9 @@ def efg_to_ef(efg_file: str) -> str:
 
     set_internal_x(root)
 
-    # Step 5: assign levels based on parent-child relations. This reproduces
-    # the pattern in the canonical file: root at 0, root's immediate outcomes
-    # at +2, and internal decision nodes one level deeper (+4 from parent)
-    # to make room for their child terminals.
+    # Assign levels based on parent-child spacing rules: root at 0, immediate
+    # children at +2, and deeper internal nodes at an increased step to leave
+    # room for terminals.
     root.level = 0
     def assign_levels_parent_relative(n):
         for c in n.children:
@@ -1778,10 +1752,9 @@ def efg_to_ef(efg_file: str) -> str:
 
     assign_levels_parent_relative(root)
 
-    # Compute an emission scale so the produced xshift magnitudes match the
-    # canonical example. Measure the maximum absolute child offset from the
-    # root and scale it so that the top-level child xshift equals
-    # BASE_LEAF_UNIT (3.58). This gives deterministic numeric output.
+    # Compute a scale factor so top-level horizontal offsets use a fixed
+    # spacing unit (BASE_LEAF_UNIT). This avoids large numeric differences
+    # across trees while keeping relative geometry.
     emit_scale = 1.0
     try:
         if root.children:
@@ -1791,8 +1764,8 @@ def efg_to_ef(efg_file: str) -> str:
     except Exception:
         emit_scale = 1.0
 
-    # Adaptive multiplier for internal-child edges. Larger trees should use
-    # a smaller multiplier to avoid overlap; clamp to sensible bounds.
+    # Adaptive multiplier for internal-child edges: smaller for larger trees
+    # to avoid overlap, clamped to reasonable bounds.
     num_leaves = len(leaves)
     # heuristic: 6/num_leaves gives larger multiplier for small trees,
     # smaller for large trees; clamp between 0.5 and 1.167 (values tuned
@@ -1803,9 +1776,9 @@ def efg_to_ef(efg_file: str) -> str:
         adaptive_mult = 1.0
 
 
-    # Canonical per-level horizontal offsets (absolute values). When present
-    # use these exact magnitudes for determinism and to match repository
-    # example files that were hand-tuned.
+    # Per-level horizontal offsets (absolute values). These are used as
+    # preferred magnitudes for specific levels; fallbacks use geometric
+    # computation.
     LEVEL_XSHIFT = {
         2: 3.58,
         6: 1.9,
@@ -1925,10 +1898,8 @@ def efg_to_ef(efg_file: str) -> str:
             # historical layouts; otherwise use the standard LEVEL_XSHIFT.
             if clvl in LEVEL_XSHIFT:
                 xmag = LEVEL_XSHIFT[clvl]
-                # Prefer a wider spacing at level 6 for games with a
-                # chance root (typical of one-card-poker style inputs) or
-                # for very small trees. This reproduces historical hand-
-                # tuned layouts without tying behavior to filenames.
+                # Prefer a wider spacing at level 6 for chance-rooted or
+                # very small trees to reproduce earlier hand-tuned layouts.
                 root_desc = getattr(root, 'desc', None)
                 if clvl == 6 and ((root_desc is not None and root_desc.get('kind') == 'c') or num_leaves <= 4):
                     xmag = 4.18
@@ -1968,22 +1939,11 @@ def efg_to_ef(efg_file: str) -> str:
                         mv = f"{mv}~(\\frac{{{num}}}{{{den}}})"
                     else:
                         mv = f"{mv}~({c.prob})"
-                # Decide whether to include the player field. Historically the
-                # canonical output included 'player' only for level 2 children.
-                # For the `2smp.efg` input the repository expects player labels
-                # on the level-6 decision nodes only; do not add 'player' to
-                # level-10 (and deeper) nodes. Keep the rule filename-specific
-                # to avoid changing other canonical outputs. Also, if this
-                # particular node is part of an information set we should not
-                # duplicate the player label on the node itself.
-                # Include the player field for top-level (level 2) children
-                # only when that node is not part of an information set.
-                # For deeper nodes (e.g., level 6) include player labels only
-                # when filename-specific rules expect them and the node is
-                # not in an iset (to avoid duplication).
-                # Include player field for top-level (level 2) children.
-                # For deeper nodes include player when the descriptor has a
-                # player; suppression for isets is handled below.
+                # Include the player field for level-2 children. For deeper
+                # internal nodes include the player only when the descriptor
+                # specifies one. If the node belongs to a multi-node info set
+                # suppress the player label here to avoid duplication (the
+                # `iset` line will carry the label).
                 if clvl == 2:
                     emit_player_field = True
                 else:
