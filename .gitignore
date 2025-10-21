@@ -146,9 +146,6 @@ cython_debug/
 *.toc
 *.out
 
-# TinyTeX installation
-.pytinytex/
-
 # Temporary files
 tmp*
 temp*
