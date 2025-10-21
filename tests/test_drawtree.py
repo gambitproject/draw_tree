@@ -577,10 +577,6 @@ class TestCommandlineArguments:
         assert dpi == 300  # Should default to 300 for invalid values
 
 
-if __name__ == "__main__":
-    pytest.main([__file__])
-
-
 def test_efg_to_ef_conversion_examples():
     """Integration test: convert the repository's example .efg files and
     require exact equality with their corresponding canonical .ef outputs.
@@ -610,3 +606,7 @@ def test_efg_to_ef_conversion_examples():
             f"Generated .ef does not match expected for {efg_path}.\nGenerated:\n" + "\n".join(gen_norm)
             + "\n\nExpected:\n" + "\n".join(expected_lines)
         )
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])
