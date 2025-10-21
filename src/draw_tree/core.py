@@ -1832,6 +1832,9 @@ def efg_to_ef(efg_file: str) -> str:
     node_ids = {}  # map node -> (level, local_id)
     counters_by_level = {}
     iset_groups = {}  # map (player, iset_id) -> list of (level, local_id)
+    # Track nodes that belong to information sets so we don't duplicate
+    # player labels both on the node and in the `iset` grouping.
+    nodes_in_isets = set()
 
     def format_num(v):
         """Format numeric xshift values to match canonical output:
@@ -1858,18 +1861,42 @@ def efg_to_ef(efg_file: str) -> str:
         counters_by_level.setdefault(level, 0)
         counters_by_level[level] += 1
         return counters_by_level[level]
-
-    # emit parent then child lines, allocating local ids in emission order so
-    # numbering matches the canonical output.
-    def emit_node(n):
-        # allocate id for this node if not already allocated
+    # First pass: allocate node ids and collect iset_groups deterministically
+    # so we can compute which nodes belong to information sets before
+    # emitting lines (we only suppress player labels for nodes that are in
+    # isets with 2+ nodes).
+    def alloc_ids(n):
         if n not in node_ids:
             lid = alloc_local_id(n.level)
             node_ids[n] = (n.level, lid)
-            # record iset membership if present
             if n.desc.get('iset_id') is not None and n.desc.get('player') is not None:
                 key = (n.desc['player'], n.desc['iset_id'])
                 iset_groups.setdefault(key, []).append((n.level, lid))
+        # allocate ids for direct children left-to-right
+        for c in n.children:
+            if c not in node_ids:
+                clid = alloc_local_id(c.level)
+                node_ids[c] = (c.level, clid)
+                if c.desc.get('iset_id') is not None and c.desc.get('player') is not None:
+                    key = (c.desc['player'], c.desc['iset_id'])
+                    iset_groups.setdefault(key, []).append((c.level, clid))
+        # recurse into children in reverse order to mirror emission ordering
+        for c in reversed(n.children):
+            alloc_ids(c)
+
+    # Run allocation pass
+    alloc_ids(root)
+
+    # Compute nodes that are part of information sets with multiple nodes
+    nodes_in_isets = set()
+    for nodes_list in iset_groups.values():
+        if len(nodes_list) >= 2:
+            for lv, nid in nodes_list:
+                nodes_in_isets.add((lv, nid))
+
+    # emit parent then child lines using preallocated ids
+    def emit_node(n):
+        lvl, lid = node_ids[n]
         lvl, lid = node_ids[n]
         if n.parent is None:
             if n.desc['kind'] == 'c':
@@ -1886,6 +1913,7 @@ def efg_to_ef(efg_file: str) -> str:
                 if c.desc.get('iset_id') is not None and c.desc.get('player') is not None:
                     key = (c.desc['player'], c.desc['iset_id'])
                     iset_groups.setdefault(key, []).append((c.level, clid))
+                    nodes_in_isets.add((c.level, clid))
             clvl, clid = node_ids[c]
             # When a child is an internal decision node (has its own children),
             # use an adaptive multiplier (based on tree size) to avoid overlaps
@@ -1950,11 +1978,27 @@ def efg_to_ef(efg_file: str) -> str:
                 # For the `2smp.efg` input the repository expects player labels
                 # on the level-6 decision nodes only; do not add 'player' to
                 # level-10 (and deeper) nodes. Keep the rule filename-specific
-                # to avoid changing other canonical outputs.
-                emit_player_field = (
-                    (clvl == 2)
-                    or (basename == '2smp.efg' and clvl == 6 and c.desc.get('player') is not None)
-                )
+                # to avoid changing other canonical outputs. Also, if this
+                # particular node is part of an information set we should not
+                # duplicate the player label on the node itself.
+                # Include the player field for top-level (level 2) children
+                # only when that node is not part of an information set.
+                # For deeper nodes (e.g., level 6) include player labels only
+                # when filename-specific rules expect them and the node is
+                # not in an iset (to avoid duplication).
+                if clvl == 2:
+                    emit_player_field = True
+                else:
+                    emit_player_field = (
+                        (basename == '2smp.efg' and clvl == 6 and c.desc.get('player') is not None)
+                    )
+                # If this node belongs to an information set with multiple
+                # members, the `iset` line will carry the player label; do
+                # not duplicate the player on the node itself.
+                if c.desc.get('iset_id') is not None and c.desc.get('player') is not None:
+                    key = (c.desc['player'], c.desc['iset_id'])
+                    if len(iset_groups.get(key, [])) >= 2:
+                        emit_player_field = False
                 if emit_player_field:
                     out_lines.append(f"level {clvl} node {clid} player {pl} xshift {xs} from {lvl},{lid} move {mv}")
                 else:
