@@ -1695,6 +1695,27 @@ class DefaultLayout:
             adaptive_mult = max(0.5, min(1.167, 6.0 / float(num_leaves)))
         except Exception:
             adaptive_mult = 1.0
+        # compute root-child imbalance ratio for selective top-level widening
+        ratio = 1.0
+        try:
+            root_desc = getattr(self.root, 'desc', None)
+            if root_desc is not None and root_desc.get('kind') == 'c' and self.root and self.root.children:
+                def count_leaves(n: 'DefaultLayout.Node') -> int:
+                    if not n.children:
+                        return 1
+                    s = 0
+                    for ch in n.children:
+                        s += count_leaves(ch)
+                    return s
+                counts = [count_leaves(ch) for ch in self.root.children]
+                if counts and min(counts) > 0:
+                    ratio = max(counts) / float(min(counts))
+                else:
+                    ratio = 1.0
+        except Exception:
+            ratio = 1.0
+        # store ratio for emit_node to use
+        self._root_child_ratio = ratio
         return emit_scale, adaptive_mult
 
     def to_lines(self) -> List[str]:
@@ -1772,7 +1793,8 @@ class DefaultLayout:
                 if c not in self.node_ids:
                     clid = alloc_local_id(c.level)
                     self.node_ids[c] = (c.level, clid)
-                    if c.desc.get('iset_id') is not None and c.desc.get('player') is not None:
+                    # guard descriptor access - some nodes may have None desc
+                    if c.desc and c.desc.get('iset_id') is not None and c.desc.get('player') is not None:
                         key = (c.desc['player'], c.desc['iset_id'])
                         self.iset_groups.setdefault(key, []).append((c.level, clid))
                         nodes_in_isets.add((c.level, clid))
@@ -1787,6 +1809,18 @@ class DefaultLayout:
                 if clvl in LEVEL_XSHIFT:
                     xmag = LEVEL_XSHIFT[clvl]
                     root_desc = getattr(self.root, 'desc', None)
+                    # Apply a controlled widening for top-level branches when
+                    # root is a chance node and the child-subtrees are imbalanced.
+                    # Use the precomputed self._root_child_ratio capped at 2.0 and
+                    # only apply when ratio indicates meaningful imbalance.
+                    if n.parent is None and root_desc is not None and root_desc.get('kind') == 'c':
+                        try:
+                            ratio = float(getattr(self, '_root_child_ratio', 1.0))
+                        except Exception:
+                            ratio = 1.0
+                        if ratio >= 1.5:
+                            factor = min(2.0, max(1.0, ratio))
+                            xmag *= factor
                     if clvl == 6 and ((root_desc is not None and root_desc.get('kind') == 'c') or len(self.leaves) <= 4):
                         xmag = 4.18
                     if clvl == 8:
