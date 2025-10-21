@@ -1835,7 +1835,8 @@ def efg_to_ef(efg_file: str) -> str:
     out_lines = []
     # Emit player name lines first (if available) like the canonical file.
     for i, name in enumerate(player_names, start=1):
-        out_lines.append(f"player {i} name {name}")
+        pname = name.replace(' ', '~')
+        out_lines.append(f"player {i} name {pname}")
     node_ids = {}  # map node -> (level, local_id)
     counters_by_level = {}
     iset_groups = {}  # map (player, iset_id) -> list of (level, local_id)
@@ -2014,7 +2015,8 @@ def efg_to_ef(efg_file: str) -> str:
 
     # Emit player lines
     for i, name in enumerate(player_names, start=1):
-        out_lines.append(f"player {i} name {name}")
+        pname = name.replace(' ', '~')
+        out_lines.append(f"player {i} name {pname}")
 
     # We'll build a tiny interpreter for the simple format seen in the example.
     # Gambit's format in the example (space-separated tokens) is processed line-by-line.
