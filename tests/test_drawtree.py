@@ -590,13 +590,12 @@ def test_efg_to_ef_conversion_example():
     # Run converter
     out = draw_tree.efg_to_ef(efg_path)
 
-    # The function returns the output path when successful; read that file
-    if os.path.exists(out):
-        with open(out, 'r', encoding='utf-8') as f:
-            generated = f.read().strip().splitlines()
-    else:
-        # If it returned content, use it directly
-        generated = out.strip().splitlines()
+    # The converter must write a .ef file next to the .efg and return its path.
+    # Fail the test if no file was created (do not accept returned string content).
+    assert isinstance(out, str), "efg_to_ef must return a file path string"
+    assert os.path.exists(out), f"efg_to_ef did not create output file: {out}"
+    with open(out, 'r', encoding='utf-8') as f:
+        generated = f.read().strip().splitlines()
 
     # Read expected
     with open(expected_ef_path, 'r', encoding='utf-8') as f:
@@ -621,11 +620,11 @@ def test_efg_to_ef_conversion_2smp():
 
     out = draw_tree.efg_to_ef(efg_path)
 
-    if os.path.exists(out):
-        with open(out, 'r', encoding='utf-8') as f:
-            generated = f.read().strip().splitlines()
-    else:
-        generated = out.strip().splitlines()
+    # Require that a file was created and returned by the converter.
+    assert isinstance(out, str), "efg_to_ef must return a file path string"
+    assert os.path.exists(out), f"efg_to_ef did not create output file: {out}"
+    with open(out, 'r', encoding='utf-8') as f:
+        generated = f.read().strip().splitlines()
 
     with open(expected_ef_path, 'r', encoding='utf-8') as f:
         _expected = f.read().strip().splitlines()
