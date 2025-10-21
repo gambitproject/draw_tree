@@ -1587,6 +1587,297 @@ def generate_png(ef_file: str, output_png: Optional[str] = None, scale_factor: f
             raise RuntimeError(f"PNG generation failed: {e}")
 
 
+class DefaultLayout:
+    """Encapsulate layout heuristics and emission for .ef generation.
+
+    Accepts a list of descriptor dicts (in preorder) and optional
+    player names, and produces the list of `.ef` lines via `to_lines()`.
+    """
+
+    class Node:
+        def __init__(self, desc=None, move_name=None, prob=None):
+            self.desc = desc
+            self.move = move_name
+            self.prob = prob
+            self.children: List['DefaultLayout.Node'] = []
+            self.parent: Optional['DefaultLayout.Node'] = None
+            self.x = 0.0
+            self.level = 0
+
+    def __init__(self, descriptors: List[dict], player_names: List[str]):
+        self.descriptors = descriptors
+        self.player_names = player_names
+        self.root: Optional[DefaultLayout.Node] = None
+        self.leaves: List[DefaultLayout.Node] = []
+        self.node_ids = {}
+        self.iset_groups = {}
+        self.counters_by_level = {}
+
+    def build_tree(self):
+        def build_node(i):
+            if i >= len(self.descriptors):
+                return None, i
+            d = self.descriptors[i]
+            node = DefaultLayout.Node(desc=d)
+            i += 1
+            if d['kind'] in ('c', 'p'):
+                for m_i, mv in enumerate(d['moves']):
+                    prob = None
+                    if m_i < len(d['probs']):
+                        prob = d['probs'][m_i]
+                    child, i = build_node(i)
+                    if child is None:
+                        child = DefaultLayout.Node(desc={'kind': 't', 'payoffs': []})
+                    child.move = mv
+                    child.prob = prob
+                    child.parent = node
+                    node.children.append(child)
+            return node, i
+
+        self.root, _ = build_node(0)
+
+    def collect_leaves(self):
+        self.leaves = []
+
+        def collect(n):
+            if not n.children:
+                self.leaves.append(n)
+            else:
+                for c in n.children:
+                    collect(c)
+
+        if self.root:
+            collect(self.root)
+
+    def assign_x(self):
+        BASE_LEAF_UNIT = 3.58
+        if len(self.leaves) > 1:
+            total = (len(self.leaves) - 1) * BASE_LEAF_UNIT
+            for i, leaf in enumerate(self.leaves):
+                leaf.x = -total / 2 + i * BASE_LEAF_UNIT
+        elif self.leaves:
+            self.leaves[0].x = 0.0
+
+    def set_internal_x(self, n: 'DefaultLayout.Node'):
+        if n.children:
+            for c in n.children:
+                self.set_internal_x(c)
+            n.x = sum(c.x for c in n.children) / len(n.children)
+
+    def assign_levels(self):
+        if not self.root:
+            return
+        self.root.level = 0
+
+        def assign(n):
+            for c in n.children:
+                if n.level == 0:
+                    step = 2
+                else:
+                    step = 4 if c.children else 2
+                c.level = n.level + step
+                assign(c)
+
+        assign(self.root)
+
+    def compute_scale_and_mult(self):
+        BASE_LEAF_UNIT = 3.58
+        emit_scale = 1.0
+        try:
+            if self.root and self.root.children:
+                max_offset = max(abs(c.x - self.root.x) for c in self.root.children)
+                if max_offset > 1e-9:
+                    emit_scale = BASE_LEAF_UNIT / max_offset
+        except Exception:
+            emit_scale = 1.0
+        num_leaves = len(self.leaves)
+        try:
+            adaptive_mult = max(0.5, min(1.167, 6.0 / float(num_leaves)))
+        except Exception:
+            adaptive_mult = 1.0
+        return emit_scale, adaptive_mult
+
+    def to_lines(self) -> List[str]:
+        # Build tree and layout
+        self.build_tree()
+        if self.root is None:
+            return []
+        self.collect_leaves()
+        self.assign_x()
+        self.set_internal_x(self.root)
+        self.assign_levels()
+        emit_scale, adaptive_mult = self.compute_scale_and_mult()
+
+        LEVEL_XSHIFT = {
+            2: 3.58,
+            6: 1.9,
+            8: 0.73,
+            10: 0.90,
+            12: 0.45,
+            14: 2.205,
+            18: 1.095,
+            20: 0.73,
+        }
+
+        out_lines: List[str] = []
+        for i, name in enumerate(self.player_names, start=1):
+            pname = name.replace(' ', '~')
+            out_lines.append(f"player {i} name {pname}")
+
+        # First pass to allocate ids deterministically
+        self.node_ids = {}
+        self.iset_groups = {}
+        self.counters_by_level = {}
+
+        def alloc_local_id(level: float) -> int:
+            self.counters_by_level.setdefault(level, 0)
+            self.counters_by_level[level] += 1
+            return self.counters_by_level[level]
+
+        def alloc_ids(n: 'DefaultLayout.Node'):
+            if n not in self.node_ids:
+                lid = alloc_local_id(n.level)
+                self.node_ids[n] = (n.level, lid)
+                if n.desc and n.desc.get('iset_id') is not None and n.desc.get('player') is not None:
+                    key = (n.desc['player'], n.desc['iset_id'])
+                    self.iset_groups.setdefault(key, []).append((n.level, lid))
+            for c in n.children:
+                if c not in self.node_ids:
+                    clid = alloc_local_id(c.level)
+                    self.node_ids[c] = (c.level, clid)
+                    if c.desc and c.desc.get('iset_id') is not None and c.desc.get('player') is not None:
+                        key = (c.desc['player'], c.desc['iset_id'])
+                        self.iset_groups.setdefault(key, []).append((c.level, clid))
+            for c in reversed(n.children):
+                alloc_ids(c)
+
+        alloc_ids(self.root)
+
+        nodes_in_isets = set()
+        for nodes_list in self.iset_groups.values():
+            if len(nodes_list) >= 2:
+                for lv, nid in nodes_list:
+                    nodes_in_isets.add((lv, nid))
+
+        def emit_node(n: 'DefaultLayout.Node'):
+            lvl, lid = self.node_ids[n]
+            if n.parent is None:
+                if n.desc and n.desc.get('kind') == 'c':
+                    out_lines.append(f"level {lvl} node {lid} player 0 ")
+                elif n.desc and n.desc.get('kind') == 'p':
+                    pl = n.desc.get('player') if n.desc.get('player') is not None else 1
+                    out_lines.append(f"level {lvl} node {lid} player {pl}")
+
+            for c in n.children:
+                if c not in self.node_ids:
+                    clid = alloc_local_id(c.level)
+                    self.node_ids[c] = (c.level, clid)
+                    if c.desc.get('iset_id') is not None and c.desc.get('player') is not None:
+                        key = (c.desc['player'], c.desc['iset_id'])
+                        self.iset_groups.setdefault(key, []).append((c.level, clid))
+                        nodes_in_isets.add((c.level, clid))
+                clvl, clid = self.node_ids[c]
+                base = (c.x - n.x) * emit_scale
+                if n.level == 0:
+                    mult = 1.0
+                else:
+                    mult = adaptive_mult if c.children else 1.0
+                fallback = base * mult
+                chosen_candidate = False
+                if clvl in LEVEL_XSHIFT:
+                    xmag = LEVEL_XSHIFT[clvl]
+                    root_desc = getattr(self.root, 'desc', None)
+                    if clvl == 6 and ((root_desc is not None and root_desc.get('kind') == 'c') or len(self.leaves) <= 4):
+                        xmag = 4.18
+                    if clvl == 8:
+                        if root_desc is not None and root_desc.get('kind') == 'c':
+                            xmag = 1.19
+                        else:
+                            xmag = 0.73
+                    candidate = xmag if base > 0 else -xmag
+                    tol_candidate = 0.25 * abs(candidate) + 0.05
+                    if (
+                        abs(fallback) < 1.0
+                        or abs(candidate - fallback) <= tol_candidate
+                        or (abs(fallback) > 1e-9 and abs(candidate) > 1.5 * abs(fallback))
+                        or (abs(fallback) > 3.0 * abs(candidate))
+                    ):
+                        xshift = candidate
+                        chosen_candidate = True
+                    else:
+                        xshift = fallback
+                        chosen_candidate = False
+                else:
+                    xshift = fallback
+                    chosen_candidate = False
+
+                # formatting
+                if chosen_candidate:
+                    if abs(xshift) < 1.0:
+                        xs = f"{xshift:.2f}"
+                    else:
+                        s = f"{xshift:.3f}"
+                        if '.' in s:
+                            s = s.rstrip('0').rstrip('.')
+                        xs = s
+                else:
+                    if abs(xshift) < 1.0:
+                        xs = f"{xshift:.2f}"
+                    else:
+                        s = f"{xshift:.2f}"
+                        if '.' in s:
+                            s = s.rstrip('0').rstrip('.')
+                        xs = s
+
+                # prepare move label and attach chance probability if parent is a chance node
+                mv = c.move if c.move else ''
+                if c.prob and n.desc and n.desc.get('kind') == 'c':
+                    if '/' in c.prob:
+                        num, den = c.prob.split('/')
+                        mv = f"{mv}~(\\frac{{{num}}}{{{den}}})"
+                    else:
+                        mv = f"{mv}~({c.prob})"
+
+                if c.desc and (c.desc.get('kind') == 'p' or c.desc.get('kind') == 'c'):
+                    pl = c.desc.get('player') if c.desc.get('player') is not None else 1
+                    if clvl == 2:
+                        emit_player_field = True
+                    else:
+                        emit_player_field = (c.desc.get('player') is not None)
+                    if c.desc and c.desc.get('iset_id') is not None and c.desc.get('player') is not None:
+                        key = (c.desc['player'], c.desc['iset_id'])
+                        if len(self.iset_groups.get(key, [])) >= 2:
+                            emit_player_field = False
+                    if emit_player_field:
+                        out_lines.append(f"level {clvl} node {clid} player {pl} xshift {xs} from {lvl},{lid} move {mv}")
+                    else:
+                        out_lines.append(f"level {clvl} node {clid} xshift {xs} from {lvl},{lid} move {mv}")
+                else:
+                    pay = ''
+                    if c.desc and c.desc.get('payoffs'):
+                        pay = ' '.join(str(x) for x in c.desc['payoffs'])
+                    # use the prepared move label (which may include probability)
+                    mvname = mv
+                    if mvname:
+                        out_lines.append(f"level {clvl} node {clid} xshift {xs} from {lvl},{lid} move {mvname} payoffs {pay}")
+                    else:
+                        out_lines.append(f"level {clvl} node {clid} xshift {xs} from {lvl},{lid} move payoffs {pay}")
+
+            for c in reversed(n.children):
+                emit_node(c)
+
+        emit_node(self.root)
+
+        # emit isets
+        for (player, iset_id), nodes_list in self.iset_groups.items():
+            if len(nodes_list) >= 2:
+                nodes_sorted = sorted(nodes_list, key=lambda t: -t[1])
+                parts = ' '.join(f"{lv},{nid}" for lv, nid in nodes_sorted)
+                out_lines.append(f"iset {parts} player {player}")
+
+        return out_lines
+
+
 def efg_to_ef(efg_file: str) -> str:
     """Convert a Gambit .efg file to the `.ef` format used by draw_tree.
 
@@ -1603,6 +1894,7 @@ def efg_to_ef(efg_file: str) -> str:
     """
 
     lines = readfile(efg_file)
+
 
     # Extract players from header if present.
     header = "\n".join(lines[:5])
@@ -1663,374 +1955,9 @@ def efg_to_ef(efg_file: str) -> str:
     # Filter descriptors to only the game records (c, p, t)
     descriptors = [d for d in descriptors if d['kind'] in ('c', 'p', 't')]
 
-    # Build node tree from descriptor list using preorder consumption.
-    class Node:
-        def __init__(self, desc=None, move_name=None, prob=None):
-            self.desc = desc
-            self.move = move_name
-            self.prob = prob
-            # typed attributes to satisfy static analyzers: parent may be None
-            # or another Node and children is a list of Nodes
-            self.children: List['Node'] = []
-            self.parent: Optional['Node'] = None
-            self.x = 0.0
-            self.level = 0
-
-    def build_node(i):
-        if i >= len(descriptors):
-            return None, i
-        d = descriptors[i]
-        node = Node(desc=d)
-        i += 1
-        if d['kind'] in ('c', 'p'):
-            # for each move, build child
-            for m_i, mv in enumerate(d['moves']):
-                prob = None
-                if m_i < len(d['probs']):
-                    prob = d['probs'][m_i]
-                child, i = build_node(i)
-                if child is None:
-                    # malformed, create terminal placeholder
-                    child = Node(desc={'kind': 't', 'payoffs': []})
-                child.move = mv
-                child.prob = prob
-                child.parent = node
-                node.children.append(child)
-        # terminals have no children
-        return node, i
-
-    root, next_idx = build_node(0)
-
-    # Collect leaves and assign x positions (inorder leaf spacing).
-    leaves = []
-
-    def collect_leaves(n):
-        if not n.children:
-            leaves.append(n)
-        else:
-            for c in n.children:
-                collect_leaves(c)
-
-    if root is None:
-        return ""
-
-    collect_leaves(root)
-    # spacing unit chosen to resemble original layout
-    # Define base unit up-front so it exists whether there are multiple leaves
-    BASE_LEAF_UNIT = 3.58
-    if len(leaves) > 1:
-        total = (len(leaves) - 1) * BASE_LEAF_UNIT
-        for i, leaf in enumerate(leaves):
-            leaf.x = -total / 2 + i * BASE_LEAF_UNIT
-    else:
-        leaves[0].x = 0.0
-
-    # Propagate internal node x positions as the mean of children.
-    def set_internal_x(n):
-        if n.children:
-            for c in n.children:
-                set_internal_x(c)
-            n.x = sum(c.x for c in n.children) / len(n.children)
-
-    set_internal_x(root)
-
-    # Assign levels based on parent-child spacing rules: root at 0, immediate
-    # children at +2, and deeper internal nodes at an increased step to leave
-    # room for terminals.
-    root.level = 0
-    def assign_levels_parent_relative(n):
-        for c in n.children:
-            # If parent is the root, place immediate children at +2 regardless
-            # of whether they themselves have children (this matches the
-            # canonical file where chance outcomes are at level 2).
-            if n.level == 0:
-                step = 2
-            else:
-                step = 4 if c.children else 2
-            c.level = n.level + step
-            assign_levels_parent_relative(c)
-
-    assign_levels_parent_relative(root)
-
-    # Compute a scale factor so top-level horizontal offsets use a fixed
-    # spacing unit (BASE_LEAF_UNIT). This avoids large numeric differences
-    # across trees while keeping relative geometry.
-    emit_scale = 1.0
-    try:
-        if root.children:
-            max_offset = max(abs(c.x - root.x) for c in root.children)
-            if max_offset > 1e-9:
-                emit_scale = BASE_LEAF_UNIT / max_offset
-    except Exception:
-        emit_scale = 1.0
-
-    # Adaptive multiplier for internal-child edges: smaller for larger trees
-    # to avoid overlap, clamped to reasonable bounds.
-    num_leaves = len(leaves)
-    # heuristic: 6/num_leaves gives larger multiplier for small trees,
-    # smaller for large trees; clamp between 0.5 and 1.167 (values tuned
-    # to match existing canonical examples).
-    try:
-        adaptive_mult = max(0.5, min(1.167, 6.0 / float(num_leaves)))
-    except Exception:
-        adaptive_mult = 1.0
-
-
-    # Per-level horizontal offsets (absolute values). These are used as
-    # preferred magnitudes for specific levels; fallbacks use geometric
-    # computation.
-    LEVEL_XSHIFT = {
-        2: 3.58,
-        6: 1.9,
-        8: 0.73,
-    10: 0.90,
-        12: 0.45,
-        14: 2.205,
-        18: 1.095,
-        20: 0.73,
-    }
-
-    # Step 6: emit .ef lines using local node numbering per level (level,node)
-    out_lines = []
-    # Emit player name lines first (if available) like the canonical file.
-    for i, name in enumerate(player_names, start=1):
-        pname = name.replace(' ', '~')
-        out_lines.append(f"player {i} name {pname}")
-    node_ids = {}  # map node -> (level, local_id)
-    counters_by_level = {}
-    iset_groups = {}  # map (player, iset_id) -> list of (level, local_id)
-    # Track nodes that belong to information sets so we don't duplicate
-    # player labels both on the node and in the `iset` grouping.
-    nodes_in_isets = set()
-
-    def format_num(v):
-        """Format numeric xshift values to match canonical output:
-        - For magnitudes < 1: keep two decimals (e.g., 0.73).
-        - For magnitudes >= 1: round to three decimals then drop
-          trailing zeros (e.g., 2.205 -> 2.205, 1.650 -> 1.65, 3.000 -> 3).
-        - Treat very small values as 0.
-        """
-        try:
-            if abs(v) < 0.005:
-                return '0'
-            if abs(v) < 1.0:
-                # keep two decimals for magnitudes < 1
-                return f"{v:.2f}"
-            # For magnitudes >= 1, round to 3 decimals then drop trailing zeros
-            s = f"{v:.3f}"
-            if '.' in s:
-                s = s.rstrip('0').rstrip('.')
-            return s
-        except Exception:
-            return str(v)
-
-    def alloc_local_id(level):
-        counters_by_level.setdefault(level, 0)
-        counters_by_level[level] += 1
-        return counters_by_level[level]
-    # First pass: allocate node ids and collect iset_groups deterministically
-    # so we can compute which nodes belong to information sets before
-    # emitting lines (we only suppress player labels for nodes that are in
-    # isets with 2+ nodes).
-    def alloc_ids(n):
-        if n not in node_ids:
-            lid = alloc_local_id(n.level)
-            node_ids[n] = (n.level, lid)
-            if n.desc.get('iset_id') is not None and n.desc.get('player') is not None:
-                key = (n.desc['player'], n.desc['iset_id'])
-                iset_groups.setdefault(key, []).append((n.level, lid))
-        # allocate ids for direct children left-to-right
-        for c in n.children:
-            if c not in node_ids:
-                clid = alloc_local_id(c.level)
-                node_ids[c] = (c.level, clid)
-                if c.desc.get('iset_id') is not None and c.desc.get('player') is not None:
-                    key = (c.desc['player'], c.desc['iset_id'])
-                    iset_groups.setdefault(key, []).append((c.level, clid))
-        # recurse into children in reverse order to mirror emission ordering
-        for c in reversed(n.children):
-            alloc_ids(c)
-
-    # Run allocation pass
-    alloc_ids(root)
-
-    # Compute nodes that are part of information sets with multiple nodes
-    nodes_in_isets = set()
-    for nodes_list in iset_groups.values():
-        if len(nodes_list) >= 2:
-            for lv, nid in nodes_list:
-                nodes_in_isets.add((lv, nid))
-
-    # emit parent then child lines using preallocated ids
-    def emit_node(n):
-        lvl, lid = node_ids[n]
-        lvl, lid = node_ids[n]
-        if n.parent is None:
-            if n.desc['kind'] == 'c':
-                out_lines.append(f"level {lvl} node {lid} player 0 ")
-            elif n.desc['kind'] == 'p':
-                pl = n.desc['player'] if n.desc['player'] is not None else 1
-                out_lines.append(f"level {lvl} node {lid} player {pl}")
-
-        # emit children lines (left-to-right) and allocate ids for children
-        for c in n.children:
-            if c not in node_ids:
-                clid = alloc_local_id(c.level)
-                node_ids[c] = (c.level, clid)
-                if c.desc.get('iset_id') is not None and c.desc.get('player') is not None:
-                    key = (c.desc['player'], c.desc['iset_id'])
-                    iset_groups.setdefault(key, []).append((c.level, clid))
-                    nodes_in_isets.add((c.level, clid))
-            clvl, clid = node_ids[c]
-            # When a child is an internal decision node (has its own children),
-            # use an adaptive multiplier (based on tree size) to avoid overlaps
-            # in large trees while preserving larger offsets for small trees.
-            base = (c.x - n.x) * emit_scale
-            # Do not reduce the top-level (root->child) horizontal offsets;
-            # only apply the adaptive multiplier for deeper parent nodes.
-            if n.level == 0:
-                mult = 1.0
-            else:
-                mult = adaptive_mult if c.children else 1.0
-            # Prefer canonical per-level magnitudes when available. Use the
-            # sign of the computed base to determine direction. Otherwise fall
-            # back to the computed base scaled by the multiplier.
-            # Compute fallback value from geometry and multiplier
-            fallback = base * mult
-            # Use canonical per-level magnitudes when available. For level 6
-            # choose a larger hand-tuned magnitude for small trees to mimic
-            # historical layouts; otherwise use the standard LEVEL_XSHIFT.
-            chosen_candidate = False
-            if clvl in LEVEL_XSHIFT:
-                xmag = LEVEL_XSHIFT[clvl]
-                # Prefer a wider spacing at level 6 for chance-rooted or
-                # very small trees to reproduce earlier hand-tuned layouts.
-                root_desc = getattr(root, 'desc', None)
-                if clvl == 6 and ((root_desc is not None and root_desc.get('kind') == 'c') or num_leaves <= 4):
-                    xmag = 4.18
-                # For level 8 prefer a larger spacing when the root is a
-                # chance node (matches historical layouts for chance-rooted
-                # games), otherwise use a narrower spacing.
-                if clvl == 8:
-                    if root_desc is not None and root_desc.get('kind') == 'c':
-                        xmag = 1.19
-                    else:
-                        xmag = 0.73
-                candidate = xmag if base > 0 else -xmag
-                # Decide whether to use the canonical per-level magnitude
-                # (candidate) or the computed geometric fallback. We prefer
-                # the canonical candidate when:
-                # - the fallback is small (we want the hand-tuned offset),
-                # - the candidate is close to the fallback (within tolerance),
-                # - OR the candidate is significantly larger than the
-                #   fallback (hand-tuned spacing for a wider layout).
-                # Tolerance: use candidate-relative tolerance so we don't
-                # prefer a small canonical magnitude when the geometric
-                # fallback is much larger.
-                tol_candidate = 0.25 * abs(candidate) + 0.05
-                if (
-                    abs(fallback) < 1.0
-                    or abs(candidate - fallback) <= tol_candidate
-                    or (abs(fallback) > 1e-9 and abs(candidate) > 1.5 * abs(fallback))
-                    or (abs(fallback) > 3.0 * abs(candidate))
-                ):
-                    xshift = candidate
-                    chosen_candidate = True
-                else:
-                    xshift = fallback
-                    chosen_candidate = False
-            else:
-                xshift = fallback
-                chosen_candidate = False
-            # Format xshift deterministically: when we used the canonical
-            # per-level candidate, preserve up to 3 decimals (so constants
-            # like 2.205 remain exact). Otherwise round geometric fallbacks
-            # to 2 decimals (matching historical output) and trim trailing
-            # zeros for values >= 1.
-            if chosen_candidate:
-                # Preserve two decimals for small canonical magnitudes
-                # (e.g. 0.90 should remain '0.90' in the canonical output),
-                # but keep three-decimal precision for larger constants so
-                # values like 2.205 remain exact and deterministic.
-                if abs(xshift) < 1.0:
-                    xs = f"{xshift:.2f}"
-                else:
-                    s = f"{xshift:.3f}"
-                    if '.' in s:
-                        s = s.rstrip('0').rstrip('.')
-                    xs = s
-            else:
-                if abs(xshift) < 1.0:
-                    xs = f"{xshift:.2f}"
-                else:
-                    s = f"{xshift:.2f}"
-                    if '.' in s:
-                        s = s.rstrip('0').rstrip('.')
-                    xs = s
-            if c.desc['kind'] == 'p' or c.desc['kind'] == 'c':
-                # For level-2 children include the player in the child line (the
-                # canonical output shows 'player 1' on those lines). For deeper
-                # internal children (e.g., level 6) omit the player field and
-                # only emit the child position and move.
-                pl = c.desc['player'] if c.desc['player'] is not None else 1
-                mv = c.move if c.move else ''
-                # Include probabilities in move labels only when the parent
-                # is a chance node (kind 'c'). This reproduces canonical
-                # files that show probabilities on chance outcomes but
-                # avoids adding them for player decision labels.
-                if c.prob and n.desc.get('kind') == 'c':
-                    if '/' in c.prob:
-                        num, den = c.prob.split('/')
-                        mv = f"{mv}~(\\frac{{{num}}}{{{den}}})"
-                    else:
-                        mv = f"{mv}~({c.prob})"
-                # Include the player field for level-2 children. For deeper
-                # internal nodes include the player only when the descriptor
-                # specifies one. If the node belongs to a multi-node info set
-                # suppress the player label here to avoid duplication (the
-                # `iset` line will carry the label).
-                if clvl == 2:
-                    emit_player_field = True
-                else:
-                    emit_player_field = (c.desc.get('player') is not None)
-                # If this node belongs to an information set with multiple
-                # members, the `iset` line will carry the player label; do
-                # not duplicate the player on the node itself.
-                if c.desc.get('iset_id') is not None and c.desc.get('player') is not None:
-                    key = (c.desc['player'], c.desc['iset_id'])
-                    if len(iset_groups.get(key, [])) >= 2:
-                        emit_player_field = False
-                if emit_player_field:
-                    out_lines.append(f"level {clvl} node {clid} player {pl} xshift {xs} from {lvl},{lid} move {mv}")
-                else:
-                    out_lines.append(f"level {clvl} node {clid} xshift {xs} from {lvl},{lid} move {mv}")
-            else:
-                # terminal: include the move name when available and the payoffs
-                pay = ''
-                if c.desc.get('payoffs'):
-                    pay = ' '.join(str(x) for x in c.desc['payoffs'])
-                mvname = c.move if c.move else ''
-                if mvname:
-                    out_lines.append(f"level {clvl} node {clid} xshift {xs} from {lvl},{lid} move {mvname} payoffs {pay}")
-                else:
-                    out_lines.append(f"level {clvl} node {clid} xshift {xs} from {lvl},{lid} move payoffs {pay}")
-
-        # recurse into children in reverse order so right-side subtrees are
-        # expanded first, matching the canonical emission order used in the
-        # expected .ef file.
-        for c in reversed(n.children):
-            emit_node(c)
-
-    emit_node(root)
-
-    # emit isets
-    for (player, iset_id), nodes_list in iset_groups.items():
-        if len(nodes_list) >= 2:
-            # Canonical file lists the nodes in a particular order (descending
-            # by local id). Sort accordingly to match the expected output.
-            nodes_sorted = sorted(nodes_list, key=lambda t: -t[1])
-            parts = ' '.join(f"{lv},{nid}" for lv, nid in nodes_sorted)
-            out_lines.append(f"iset {parts} player {player}")
+    # Layout/emission: delegate to DefaultLayout class for clarity/testability
+    layout = DefaultLayout(descriptors, player_names)
+    out_lines = layout.to_lines()
 
     try:
         efg_path = Path(efg_file)
