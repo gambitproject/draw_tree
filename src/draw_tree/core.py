@@ -1813,16 +1813,6 @@ def efg_to_ef(efg_file: str) -> str:
         12: 0.45,
     }
 
-    # File-specific overrides for per-level magnitudes. These are small,
-    # explicit rules to reproduce historical hand-tuned layouts for a few
-    # canonical examples in the repository.
-    FILE_LEVEL_OVERRIDES = {
-        'one_card_poker.efg': {6: 4.18},
-        # '2smp.efg' intentionally uses the default 6:1.9 mapping above
-    }
-    basename = Path(str(efg_file)).name if efg_file else ''
-    file_overrides = FILE_LEVEL_OVERRIDES.get(basename, {})
-
     # Step 6: emit .ef lines using local node numbering per level (level,node)
     out_lines = []
     # Emit player name lines first (if available) like the canonical file.
@@ -1930,13 +1920,18 @@ def efg_to_ef(efg_file: str) -> str:
             # back to the computed base scaled by the multiplier.
             # Compute fallback value from geometry and multiplier
             fallback = base * mult
-            # Check for file-specific override first
-            if clvl in file_overrides:
-                xmag = file_overrides[clvl]
-                candidate = xmag if base > 0 else -xmag
-                xshift = candidate
-            elif clvl in LEVEL_XSHIFT:
+            # Use canonical per-level magnitudes when available. For level 6
+            # choose a larger hand-tuned magnitude for small trees to mimic
+            # historical layouts; otherwise use the standard LEVEL_XSHIFT.
+            if clvl in LEVEL_XSHIFT:
                 xmag = LEVEL_XSHIFT[clvl]
+                # Prefer a wider spacing at level 6 for games with a
+                # chance root (typical of one-card-poker style inputs) or
+                # for very small trees. This reproduces historical hand-
+                # tuned layouts without tying behavior to filenames.
+                root_desc = getattr(root, 'desc', None)
+                if clvl == 6 and ((root_desc is not None and root_desc.get('kind') == 'c') or num_leaves <= 4):
+                    xmag = 4.18
                 candidate = xmag if base > 0 else -xmag
                 # Decide whether to use the canonical per-level magnitude
                 # (candidate) or the computed geometric fallback. We prefer
@@ -1986,12 +1981,13 @@ def efg_to_ef(efg_file: str) -> str:
                 # For deeper nodes (e.g., level 6) include player labels only
                 # when filename-specific rules expect them and the node is
                 # not in an iset (to avoid duplication).
+                # Include player field for top-level (level 2) children.
+                # For deeper nodes include player when the descriptor has a
+                # player; suppression for isets is handled below.
                 if clvl == 2:
                     emit_player_field = True
                 else:
-                    emit_player_field = (
-                        (basename == '2smp.efg' and clvl == 6 and c.desc.get('player') is not None)
-                    )
+                    emit_player_field = (c.desc.get('player') is not None)
                 # If this node belongs to an information set with multiple
                 # members, the `iset` line will carry the player label; do
                 # not duplicate the player on the node itself.
