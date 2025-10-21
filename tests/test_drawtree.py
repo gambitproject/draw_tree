@@ -612,3 +612,26 @@ def test_efg_to_ef_conversion_example():
     assert gen_norm == expected_lines, (
         "Generated .ef does not match expected.\nGenerated:\n" + "\n".join(gen_norm) + "\n\nExpected:\n" + "\n".join(expected_lines)
     )
+
+
+def test_efg_to_ef_conversion_2smp():
+    """Integration test: convert the provided 2smp.efg to .ef and compare."""
+    efg_path = os.path.join('games', 'efg', '2smp.efg')
+    expected_ef_path = os.path.join('games', '2smp.ef')
+
+    out = draw_tree.efg_to_ef(efg_path)
+
+    if os.path.exists(out):
+        with open(out, 'r', encoding='utf-8') as f:
+            generated = f.read().strip().splitlines()
+    else:
+        generated = out.strip().splitlines()
+
+    with open(expected_ef_path, 'r', encoding='utf-8') as f:
+        _expected = f.read().strip().splitlines()
+
+    gen_norm = [line.strip() for line in generated if line.strip()]
+    expected_lines = [ln.strip() for ln in _expected if ln.strip()]
+    assert gen_norm == expected_lines, (
+        "Generated .ef does not match expected for 2smp.\nGenerated:\n" + "\n".join(gen_norm) + "\n\nExpected:\n" + "\n".join(expected_lines)
+    )
