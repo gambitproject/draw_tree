@@ -15,7 +15,7 @@ level 6 node 4 xshift 1.9 from 2,1 move D2
 level 8 node 5 xshift -0.73 from 6,4 move U3 payoffs 0 0 0
 level 8 node 6 xshift 0.73 from 6,4 move D3 payoffs 3 4 6
 level 10 node 1 player 1 xshift -1.65 from 6,3 move U3
-level 8 node 7 xshift 3.3 from 6,3 move D3 payoffs 0 0 0
+level 8 node 7 xshift 0.73 from 6,3 move D3 payoffs 0 0 0
 level 14 node 1 xshift -1.47 from 10,1 move U1
 level 14 node 2 xshift 1.47 from 10,1 move D1
 level 18 node 1 xshift -0.73 from 14,2 move U2
