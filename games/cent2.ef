@@ -1,8 +1,8 @@
 player 1 name Player~1
 player 2 name Player~2
 level 0 node 1 player 0 
-level 2 node 1 player 1 xshift -7.16 from 0,1 move 1=rational~(1)
-level 2 node 2 player 1 xshift 7.16 from 0,1 move 1=altruist~(\frac{19}{20})
+level 2 node 1 player 0 xshift -7.16 from 0,1 move 1=rational~(1)
+level 2 node 2 player 0 xshift 7.16 from 0,1 move 1=altruist~(\frac{19}{20})
 level 6 node 1 xshift -4.18 from 2,2 move 2=rational~(2)
 level 6 node 2 xshift 4.18 from 2,2 move 2=altruist~(\frac{19}{20})
 level 10 node 1 xshift -0.90 from 6,2 move p
