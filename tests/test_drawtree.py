@@ -587,6 +587,7 @@ def test_efg_to_ef_conversion_examples():
     examples = [
         ('games/efg/one_card_poker.efg', 'games/one_card_poker.ef'),
         ('games/efg/2smp.efg', 'games/2smp.ef'),
+        ('games/efg/2s2x2x2.efg', 'games/2s2x2x2.ef'),
     ]
 
     for efg_path, expected_ef_path in examples:
