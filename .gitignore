@@ -154,3 +154,6 @@ tmp*
 temp*
 .tmp*
 .temp*
+
+# .ef files generated from .efg files (the test suite)
+games/efg/*.ef
