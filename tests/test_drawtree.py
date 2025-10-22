@@ -577,5 +577,38 @@ class TestCommandlineArguments:
         assert dpi == 300  # Should default to 300 for invalid values
 
 
+def test_efg_to_ef_conversion_examples():
+    """Integration test: convert the repository's example .efg files and
+    require exact equality with their corresponding canonical .ef outputs.
+
+    This combined test iterates over known example pairs so it's easy to
+    extend with additional examples in the future.
+    """
+    examples = [
+        ('games/efg/one_card_poker.efg', 'games/one_card_poker.ef'),
+        ('games/efg/2smp.efg', 'games/2smp.ef'),
+        ('games/efg/2s2x2x2.efg', 'games/2s2x2x2.ef'),
+        ('games/efg/cent2.efg', 'games/cent2.ef'),
+    ]
+
+    for efg_path, expected_ef_path in examples:
+        out = draw_tree.efg_to_ef(efg_path)
+        # Converter must return a path and write the file
+        assert isinstance(out, str), "efg_to_ef must return a file path string"
+        assert os.path.exists(out), f"efg_to_ef did not create output file: {out}"
+
+        with open(out, 'r', encoding='utf-8') as f:
+            generated = f.read().strip().splitlines()
+        with open(expected_ef_path, 'r', encoding='utf-8') as f:
+            expected = f.read().strip().splitlines()
+
+        gen_norm = [line.strip() for line in generated if line.strip()]
+        expected_lines = [ln.strip() for ln in expected if ln.strip()]
+        assert gen_norm == expected_lines, (
+            f"Generated .ef does not match expected for {efg_path}.\nGenerated:\n" + "\n".join(gen_norm)
+            + "\n\nExpected:\n" + "\n".join(expected_lines)
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
