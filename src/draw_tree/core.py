@@ -1262,6 +1262,16 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) 
     Returns:
         Complete TikZ code ready for use in Jupyter notebooks or LaTeX documents.
     """
+    # If user supplied an EFG file, convert it to .ef first so the existing
+    # ef-based pipeline can be reused. efg_to_ef returns a path string when
+    # it successfully writes the .ef file.
+    if isinstance(ef_file, str) and ef_file.lower().endswith('.efg'):
+        try:
+            ef_file = efg_to_ef(ef_file)
+        except Exception:
+            # fall through and let ef_to_tex raise a clearer error later
+            pass
+
     # Step 1: Generate the tikzpicture content using ef_to_tex logic
     tikz_picture_content = ef_to_tex(ef_file, scale_factor, show_grid)
     
@@ -1374,6 +1384,13 @@ def generate_tex(ef_file: str, output_tex: Optional[str] = None, scale_factor: f
         ef_path = Path(ef_file)
         output_tex = ef_path.with_suffix('.tex').name
     
+    # If input is an EFG file, convert it first
+    if isinstance(ef_file, str) and ef_file.lower().endswith('.efg'):
+        try:
+            ef_file = efg_to_ef(ef_file)
+        except Exception:
+            pass
+
     # Generate TikZ content using draw_tree
     tikz_content = draw_tree(ef_file, scale_factor, show_grid)
     
