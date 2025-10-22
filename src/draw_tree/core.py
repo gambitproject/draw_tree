@@ -2274,11 +2274,27 @@ def efg_to_ef(efg_file: str) -> str:
             else:
                 iset_id = None
         elif kind == 't':
-            # terminal: extract payoffs
+            # terminal: extract payoffs (allow integers and decimals)
             if brace:
-                # numbers possibly separated by commas
-                pay_tokens = re.findall(r'(-?\d+)', brace.group(1))
-                payoffs = [int(x) for x in pay_tokens]
+                # Match floats like 12.80, .80, -1.5 or integers like 3
+                pay_tokens = re.findall(r'(-?\d*\.\d+|-?\d+)', brace.group(1))
+                payoffs = []
+                for tok in pay_tokens:
+                    # If token contains a decimal point treat as float and
+                    # format with two decimal places (keeps trailing zeros),
+                    # otherwise treat as integer.
+                    if '.' in tok:
+                        try:
+                            v = float(tok)
+                            payoffs.append("{:.2f}".format(v))
+                        except Exception:
+                            # fallback: keep original token
+                            payoffs.append(tok)
+                    else:
+                        try:
+                            payoffs.append(str(int(tok)))
+                        except Exception:
+                            payoffs.append(tok)
         descriptors.append({
             'kind': kind,
             'player': player,
