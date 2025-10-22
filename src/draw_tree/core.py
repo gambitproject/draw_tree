@@ -1718,6 +1718,109 @@ class DefaultLayout:
         self._root_child_ratio = ratio
         return emit_scale, adaptive_mult
 
+    def _separate_iset_levels(self):
+        """Relocate colliding information-set groups to distinct integer levels.
+
+        For each info-set group that shares an integer level with other groups,
+        deterministically move the later groups to the nearest available
+        integer level that is strictly greater than all their parents' levels
+        and strictly less than all their children's levels. Update
+        self.node_ids, node.level and entries in self.iset_groups.
+        """
+        if not self.iset_groups:
+            return
+
+        # Build quick lookup from (int_level, local_id) -> node_obj
+        lookup = {}
+        for node_obj, (lvl, lid) in list(self.node_ids.items()):
+            try:
+                il = int(round(lvl))
+            except Exception:
+                il = int(lvl)
+            lookup[(il, lid)] = node_obj
+
+        # Occupied integer levels
+        occupied = set(int(round(lvl)) for (lvl, _) in self.node_ids.values())
+
+        # Map integer level -> groups present there
+        level_groups = {}
+        for group_key, lst in self.iset_groups.items():
+            for lv, nid in lst:
+                il = int(round(lv))
+                level_groups.setdefault(il, set()).add(group_key)
+
+        # Process levels in increasing order deterministically
+        for il in sorted(level_groups.keys()):
+            groups = sorted(level_groups[il], key=lambda k: (k[0], k[1]))
+            if len(groups) <= 1:
+                continue
+            # keep the first group, move others
+            for group_key in groups[1:]:
+                # find nodes of this group at this integer level
+                entries = [ (lv, nid) for (lv, nid) in list(self.iset_groups.get(group_key, [])) if int(round(lv)) == il ]
+                node_objs = []
+                for lv, nid in entries:
+                    n = lookup.get((il, nid))
+                    if n is not None:
+                        node_objs.append((n, nid))
+                if not node_objs:
+                    continue
+
+                # compute bounds: must be > all parents' levels and < all childrens' levels
+                parent_max = max((int(round(n.parent.level)) if n.parent is not None else -100000) for (n, _) in node_objs)
+                child_min = min((min((int(round(ch.level)) for ch in n.children), default=100000) if n.children else 100000) for (n, _) in node_objs)
+                min_allowed = parent_max + 1
+                max_allowed = child_min - 1
+
+                # search nearest free integer level within [min_allowed, max_allowed]
+                candidate = None
+                if min_allowed <= il <= max_allowed and il not in occupied:
+                    candidate = il
+                else:
+                    # try offsets 1, -1, 2, -2 ... within allowed window
+                    for offset in range(1, 201):
+                        for sign in (0, 1, -1):
+                            if sign == 0:
+                                cand = il + offset
+                            elif sign == 1:
+                                cand = il + offset
+                            else:
+                                cand = il - offset
+                            if cand < min_allowed or cand > max_allowed:
+                                continue
+                            if cand not in occupied:
+                                candidate = cand
+                                break
+                        if candidate is not None:
+                            break
+
+                # if still not found, try any free slot from min_allowed upward
+                if candidate is None:
+                    for cand in range(min_allowed, max_allowed + 1):
+                        if cand not in occupied:
+                            candidate = cand
+                            break
+
+                if candidate is None:
+                    # last resort: pick next free integer >= min_allowed
+                    cand = max(min_allowed, il + 1)
+                    while cand in occupied:
+                        cand += 1
+                    candidate = cand
+
+                # apply candidate to all nodes in group (update node.level, node_ids, iset_groups)
+                for node_obj, nid in node_objs:
+                    node_obj.level = int(candidate)
+                    self.node_ids[node_obj] = (int(candidate), nid)
+                    # update lookup
+                    lookup[(int(candidate), nid)] = node_obj
+                occupied.add(int(candidate))
+                # update iset_groups stored levels
+                lst = self.iset_groups.get(group_key, [])
+                for i, (oldlv, idn) in enumerate(list(lst)):
+                    if int(round(oldlv)) == il and idn in [nid for (_, nid) in node_objs]:
+                        lst[i] = (int(candidate), idn)
+
     def to_lines(self) -> List[str]:
         # Build tree and layout
         self.build_tree()
@@ -1773,6 +1876,13 @@ class DefaultLayout:
                 alloc_ids(c)
 
         alloc_ids(self.root)
+
+        # After ids are allocated, ensure info-set groups do not collide
+        # on the same integer level by relocating groups if necessary.
+        try:
+            self._separate_iset_levels()
+        except Exception:
+            pass
 
         nodes_in_isets = set()
         for nodes_list in self.iset_groups.values():
