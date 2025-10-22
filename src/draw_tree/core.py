@@ -1739,9 +1739,6 @@ class DefaultLayout:
                 il = int(lvl)
             lookup[(il, lid)] = node_obj
 
-        # Occupied integer levels
-        occupied = set(int(round(lvl)) for (lvl, _) in self.node_ids.values())
-
         # Treat levels that contain terminal nodes as unavailable for iset placement.
         # Find levels of terminal nodes and mark them occupied so we never
         # relocate an info-set into a level that already holds terminals.
@@ -1750,7 +1747,20 @@ class DefaultLayout:
             desc = getattr(nobj, 'desc', None)
             if desc and desc.get('kind') == 't':
                 terminal_levels.add(int(round(lv)))
+
+        # Also consider the integer levels currently used by info-set groups
+        # as occupied so groups don't collide with each other. Do NOT mark
+        # levels used by non-info-set nodes as occupied — that allows those
+        # nodes to share levels freely.
+        iset_levels = set()
+        for lst in self.iset_groups.values():
+            for lv, _ in lst:
+                iset_levels.add(int(round(lv)))
+
+        # Occupied levels are terminal levels plus existing iset levels.
+        occupied = set()
         occupied.update(terminal_levels)
+        occupied.update(iset_levels)
 
         # Map integer level -> groups present there
         level_groups = {}
