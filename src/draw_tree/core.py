@@ -2030,6 +2030,52 @@ class DefaultLayout:
         except Exception:
             pass
 
+        # Unify terminal levels by tree depth: ensure all leaves at the same
+        # tree depth share the same integer level. If any leaf at a given
+        # depth is higher (larger integer level) than its peers, raise the
+        # others to match that level and update node_ids/isets.
+        try:
+            # compute depth (distance from root) for every node
+            node_depth = {}
+            def compute_depth(n, d=0):
+                node_depth[n] = d
+                for ch in n.children:
+                    compute_depth(ch, d+1)
+            if self.root:
+                compute_depth(self.root, 0)
+
+            # group leaves by depth
+            depth_groups = {}
+            for leaf in self.leaves:
+                d = node_depth.get(leaf, 0)
+                depth_groups.setdefault(d, []).append(leaf)
+
+            changed = False
+            for d, leaves in depth_groups.items():
+                # find maximum integer level among these leaves
+                maxlvl = max(int(round(leaf.level)) for leaf in leaves)
+                for leaf in leaves:
+                    if int(round(leaf.level)) < maxlvl:
+                        leaf.level = int(maxlvl)
+                        # update node_ids if present
+                        if leaf in self.node_ids:
+                            lid = self.node_ids[leaf][1]
+                            self.node_ids[leaf] = (int(maxlvl), lid)
+                        changed = True
+
+            if changed:
+                # rebuild iset_groups deterministically
+                new_iset = {}
+                for nobj, (lv, lid) in list(self.node_ids.items()):
+                    if nobj.desc and nobj.desc.get('iset_id') is not None and nobj.desc.get('player') is not None:
+                        key = (nobj.desc['player'], nobj.desc['iset_id'])
+                        new_iset.setdefault(key, []).append((int(round(nobj.level)), lid))
+                for k in new_iset:
+                    new_iset[k] = sorted(new_iset[k], key=lambda t: (int(t[0]), int(t[1])))
+                self.iset_groups = new_iset
+        except Exception:
+            pass
+
         nodes_in_isets = set()
         for nodes_list in self.iset_groups.values():
             if len(nodes_list) >= 2:
