@@ -1742,6 +1742,16 @@ class DefaultLayout:
         # Occupied integer levels
         occupied = set(int(round(lvl)) for (lvl, _) in self.node_ids.values())
 
+        # Treat levels that contain terminal nodes as unavailable for iset placement.
+        # Find levels of terminal nodes and mark them occupied so we never
+        # relocate an info-set into a level that already holds terminals.
+        terminal_levels = set()
+        for nobj, (lv, lid) in list(self.node_ids.items()):
+            desc = getattr(nobj, 'desc', None)
+            if desc and desc.get('kind') == 't':
+                terminal_levels.add(int(round(lv)))
+        occupied.update(terminal_levels)
+
         # Map integer level -> groups present there
         level_groups = {}
         for group_key, lst in self.iset_groups.items():
@@ -1766,9 +1776,25 @@ class DefaultLayout:
                 if not node_objs:
                     continue
 
+                # Also consider all nodes that belong to this iset group (not just those at il).
+                full_group_nodes = []
+                for glv, gid in list(self.iset_groups.get(group_key, [])):
+                    gnode = lookup.get((int(round(glv)), gid))
+                    if gnode is not None:
+                        full_group_nodes.append((gnode, gid))
+
                 # compute bounds: must be > all parents' levels and < all childrens' levels
-                parent_max = max((int(round(n.parent.level)) if n.parent is not None else -100000) for (n, _) in node_objs)
-                child_min = min((min((int(round(ch.level)) for ch in n.children), default=100000) if n.children else 100000) for (n, _) in node_objs)
+                # Use full_group_nodes for bounds so we don't miss children/parents
+                parents = []
+                children_mins = []
+                source_nodes = full_group_nodes if full_group_nodes else node_objs
+                for (nnode, _) in source_nodes:
+                    if nnode.parent is not None:
+                        parents.append(int(round(nnode.parent.level)))
+                    if nnode.children:
+                        children_mins.append(min(int(round(ch.level)) for ch in nnode.children))
+                parent_max = max(parents) if parents else -100000
+                child_min = min(children_mins) if children_mins else 100000
                 min_allowed = parent_max + 1
                 max_allowed = child_min - 1
 
@@ -1779,13 +1805,8 @@ class DefaultLayout:
                 else:
                     # try offsets 1, -1, 2, -2 ... within allowed window
                     for offset in range(1, 201):
-                        for sign in (0, 1, -1):
-                            if sign == 0:
-                                cand = il + offset
-                            elif sign == 1:
-                                cand = il + offset
-                            else:
-                                cand = il - offset
+                        # prefer shifting outward (il+offset) then inward (il-offset)
+                        for cand in (il + offset, il - offset):
                             if cand < min_allowed or cand > max_allowed:
                                 continue
                             if cand not in occupied:
@@ -1802,24 +1823,62 @@ class DefaultLayout:
                             break
 
                 if candidate is None:
-                    # last resort: pick next free integer >= min_allowed
+                    # try to find next free integer >= min_allowed (may exceed max_allowed)
                     cand = max(min_allowed, il + 1)
                     while cand in occupied:
                         cand += 1
-                    candidate = cand
+                    desired = cand
+                    # If desired would be below children (i.e., > max_allowed),
+                    # shift the subtrees of these nodes' children upward so we can
+                    # insert the info-set level without placing it under terminals.
+                    if max_allowed is not None and desired > max_allowed:
+                        shift_needed = desired - max_allowed
 
-                # apply candidate to all nodes in group (update node.level, node_ids, iset_groups)
-                for node_obj, nid in node_objs:
+                        # collect descendants (exclude the group nodes themselves)
+                        def collect_subtree(n: 'DefaultLayout.Node', acc: set):
+                            if n in acc:
+                                return
+                            acc.add(n)
+                            for ch in n.children:
+                                collect_subtree(ch, acc)
+
+                        descendant_nodes = set()
+                        for n_obj, _ in full_group_nodes:
+                            for ch in n_obj.children:
+                                collect_subtree(ch, descendant_nodes)
+
+                        # shift levels for descendant nodes (lift children/terminals upward)
+                        for nshift in descendant_nodes:
+                            old_level = int(round(nshift.level))
+                            nshift.level = int(round(nshift.level)) + shift_needed
+                            if nshift in self.node_ids:
+                                _, lid = self.node_ids[nshift]
+                                self.node_ids[nshift] = (nshift.level, lid)
+                            # update any iset_groups entries that reference this node
+                            for gkey, glst in self.iset_groups.items():
+                                for j, (olv, oid) in enumerate(list(glst)):
+                                    if int(round(olv)) == old_level and oid == self.node_ids.get(nshift, (nshift.level, None))[1]:
+                                        glst[j] = (nshift.level, oid)
+
+                        # update occupied set to include new levels
+                        occupied.update(int(round(n.level)) for n in descendant_nodes)
+                        # also ensure we don't select terminal levels later
+                        occupied.update(terminal_levels)
+                        candidate = desired
+                    else:
+                        candidate = desired
+
+                # apply candidate to all members of the full info-set group
+                for node_obj, nid in full_group_nodes:
                     node_obj.level = int(candidate)
                     self.node_ids[node_obj] = (int(candidate), nid)
                     # update lookup
                     lookup[(int(candidate), nid)] = node_obj
                 occupied.add(int(candidate))
-                # update iset_groups stored levels
+                # update iset_groups stored levels for this group to the candidate
                 lst = self.iset_groups.get(group_key, [])
                 for i, (oldlv, idn) in enumerate(list(lst)):
-                    if int(round(oldlv)) == il and idn in [nid for (_, nid) in node_objs]:
-                        lst[i] = (int(candidate), idn)
+                    lst[i] = (int(candidate), idn)
 
     def to_lines(self) -> List[str]:
         # Build tree and layout
