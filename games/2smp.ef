@@ -19,20 +19,20 @@ level 13 node 7 xshift -0.45 from 9,3 move H payoffs 1 -1
 level 13 node 8 xshift 0.45 from 9,3 move T payoffs -1 1
 level 6 node 3 player 1 xshift -1.9 from 2,1 move H
 level 6 node 4 player 1 xshift 1.9 from 2,1 move T
-level 10 node 5 xshift -0.90 from 6,4 move H
-level 10 node 6 xshift 0.90 from 6,4 move T
-level 13 node 9 xshift -0.45 from 10,6 move H payoffs -1 1
-level 13 node 10 xshift 0.45 from 10,6 move T payoffs 1 -1
-level 13 node 11 xshift -0.45 from 10,5 move H payoffs 1 -1
-level 13 node 12 xshift 0.45 from 10,5 move T payoffs -1 1
-level 11 node 7 xshift -0.90 from 6,3 move H
-level 11 node 8 xshift 0.90 from 6,3 move T
-level 13 node 13 xshift -0.45 from 11,8 move H payoffs -1 1
-level 13 node 14 xshift 0.45 from 11,8 move T payoffs 1 -1
-level 13 node 15 xshift -0.45 from 11,7 move H payoffs 1 -1
-level 13 node 16 xshift 0.45 from 11,7 move T payoffs -1 1
+level 11 node 5 xshift -0.90 from 6,4 move H
+level 11 node 6 xshift 0.90 from 6,4 move T
+level 13 node 9 xshift -0.45 from 11,6 move H payoffs -1 1
+level 13 node 10 xshift 0.45 from 11,6 move T payoffs 1 -1
+level 13 node 11 xshift -0.45 from 11,5 move H payoffs 1 -1
+level 13 node 12 xshift 0.45 from 11,5 move T payoffs -1 1
+level 10 node 7 xshift -0.90 from 6,3 move H
+level 10 node 8 xshift 0.90 from 6,3 move T
+level 13 node 13 xshift -0.45 from 10,8 move H payoffs -1 1
+level 13 node 14 xshift 0.45 from 10,8 move T payoffs 1 -1
+level 13 node 15 xshift -0.45 from 10,7 move H payoffs 1 -1
+level 13 node 16 xshift 0.45 from 10,7 move T payoffs -1 1
 iset 2,2 2,1 player 2
 iset 8,2 8,1 player 2
 iset 9,4 9,3 player 2
-iset 10,6 10,5 player 2
-iset 11,8 11,7 player 2
+iset 11,6 11,5 player 2
+iset 10,8 10,7 player 2
