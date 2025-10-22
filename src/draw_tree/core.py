@@ -1748,23 +1748,25 @@ class DefaultLayout:
             if desc and desc.get('kind') == 't':
                 terminal_levels.add(int(round(lv)))
 
-        # Also consider the integer levels currently used by info-set groups
-        # as occupied so groups don't collide with each other. Do NOT mark
-        # levels used by non-info-set nodes as occupied — that allows those
-        # nodes to share levels freely.
+        # Only consider info-set groups that actually have multiple members.
+        # Singleton iset entries should not be treated as colliding groups or
+        # as occupied levels — they are emitted as normal nodes.
+        filtered_iset_groups = {k: v for k, v in self.iset_groups.items() if len(v) >= 2}
+
+        # iset levels collected only from filtered groups
         iset_levels = set()
-        for lst in self.iset_groups.values():
+        for lst in filtered_iset_groups.values():
             for lv, _ in lst:
                 iset_levels.add(int(round(lv)))
 
-        # Occupied levels are terminal levels plus existing iset levels.
+        # Occupied levels are terminal levels plus existing multi-member iset levels.
         occupied = set()
         occupied.update(terminal_levels)
         occupied.update(iset_levels)
 
-        # Map integer level -> groups present there
+        # Map integer level -> groups present there (only multi-member groups)
         level_groups = {}
-        for group_key, lst in self.iset_groups.items():
+        for group_key, lst in filtered_iset_groups.items():
             for lv, nid in lst:
                 il = int(round(lv))
                 level_groups.setdefault(il, set()).add(group_key)
@@ -1890,108 +1892,7 @@ class DefaultLayout:
                 for i, (oldlv, idn) in enumerate(list(lst)):
                     lst[i] = (int(candidate), idn)
 
-        # --- Phase 2: unify levels for non-info-set, non-terminal nodes by depth
-        # Compute depth for every node
-        depths = {}
-        def compute_depth(n: 'DefaultLayout.Node', d: int):
-            depths[n] = d
-            for ch in n.children:
-                compute_depth(ch, d + 1)
-
-        if self.root:
-            compute_depth(self.root, 0)
-
-        # Helper to detect iset membership
-        def is_iset_node(n: 'DefaultLayout.Node') -> bool:
-            desc = getattr(n, 'desc', None)
-            if not desc or desc.get('iset_id') is None or desc.get('player') is None:
-                return False
-            key = (desc.get('player'), desc.get('iset_id'))
-            return len(self.iset_groups.get(key, [])) >= 2
-
-        # Group nodes by depth that are non-iset and non-terminal
-        depth_groups = {}
-        for n, d in depths.items():
-            desc = getattr(n, 'desc', None)
-            kind = desc.get('kind') if desc else None
-            if kind == 't':
-                continue
-            if is_iset_node(n):
-                continue
-            depth_groups.setdefault(d, []).append(n)
-
-        for d in sorted(depth_groups.keys()):
-            group_nodes = depth_groups[d]
-            if len(group_nodes) <= 1:
-                continue
-
-            # compute bounds across group
-            parent_max = max((int(round(n.parent.level)) if n.parent is not None else -100000) for n in group_nodes)
-            child_min = min((min((int(round(ch.level)) for ch in n.children), default=100000) if n.children else 100000) for n in group_nodes)
-            min_allowed = parent_max + 1
-            max_allowed = child_min - 1
-
-            # prefer to choose an existing level used by these nodes if valid and not occupied
-            current_levels = [int(round(n.level)) for n in group_nodes]
-            candidate = None
-            for lv in sorted(set(current_levels)):
-                if min_allowed <= lv <= max_allowed and lv not in occupied:
-                    candidate = lv
-                    break
-
-            # otherwise search within window for free level
-            if candidate is None:
-                for cand in range(min_allowed, max_allowed + 1):
-                    if cand not in occupied:
-                        candidate = cand
-                        break
-
-            # fallback: find next free >= min_allowed (may exceed max_allowed)
-            if candidate is None:
-                cand = max(min_allowed, min(current_levels) + 1)
-                while cand in occupied:
-                    cand += 1
-                desired = cand
-                # if desired would be below children, lift descendants (not the group nodes)
-                if max_allowed is not None and desired > max_allowed:
-                    shift_needed = desired - max_allowed
-
-                    def collect_subtree(n: 'DefaultLayout.Node', acc: set):
-                        if n in acc:
-                            return
-                        acc.add(n)
-                        for ch in n.children:
-                            collect_subtree(ch, acc)
-
-                    descendant_nodes = set()
-                    for n in group_nodes:
-                        for ch in n.children:
-                            collect_subtree(ch, descendant_nodes)
-
-                    for nshift in descendant_nodes:
-                        old_level = int(round(nshift.level))
-                        nshift.level = int(round(nshift.level)) + shift_needed
-                        if nshift in self.node_ids:
-                            _, lid = self.node_ids[nshift]
-                            self.node_ids[nshift] = (nshift.level, lid)
-                        for gkey, glst in self.iset_groups.items():
-                            for j, (olv, oid) in enumerate(list(glst)):
-                                if int(round(olv)) == old_level and oid == self.node_ids.get(nshift, (nshift.level, None))[1]:
-                                    glst[j] = (nshift.level, oid)
-                    occupied.update(int(round(n.level)) for n in descendant_nodes)
-                    occupied.update(terminal_levels)
-                    candidate = desired
-                else:
-                    candidate = desired
-
-            # apply candidate to all group nodes
-            if candidate is not None:
-                for nassign in group_nodes:
-                    nassign.level = int(candidate)
-                    if nassign in self.node_ids:
-                        _, lid = self.node_ids[nassign]
-                        self.node_ids[nassign] = (int(candidate), lid)
-                occupied.add(int(candidate))
+        # Phase 2 unification was removed to preserve canonical example layouts
 
     def to_lines(self) -> List[str]:
         # Build tree and layout
@@ -2007,8 +1908,10 @@ class DefaultLayout:
         LEVEL_XSHIFT = {
             2: 3.58,
             6: 1.9,
-            8: 0.73,
+            8: 0.90,
+            9: 0.90,
             10: 0.90,
+            11: 0.90,
             12: 0.45,
             14: 2.205,
             18: 1.095,
@@ -2105,11 +2008,6 @@ class DefaultLayout:
                             xmag *= factor
                     if clvl == 6 and ((root_desc is not None and root_desc.get('kind') == 'c') or len(self.leaves) <= 4):
                         xmag = 4.18
-                    if clvl == 8:
-                        if root_desc is not None and root_desc.get('kind') == 'c':
-                            xmag = 1.19
-                        else:
-                            xmag = 0.73
                     candidate = xmag if base > 0 else -xmag
                     tol_candidate = 0.25 * abs(candidate) + 0.05
                     if (
