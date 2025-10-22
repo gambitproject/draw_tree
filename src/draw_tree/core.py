@@ -1873,7 +1873,13 @@ class DefaultLayout:
                         mv = f"{mv}~({c.prob})"
 
                 if c.desc and (c.desc.get('kind') == 'p' or c.desc.get('kind') == 'c'):
-                    pl = c.desc.get('player') if c.desc.get('player') is not None else 1
+                    # For chance nodes emit player 0; for player nodes emit the
+                    # declared player number (default 1). This fixes cases like
+                    # `cent2` where internal chance nodes must be printed as player 0.
+                    if c.desc.get('kind') == 'c':
+                        pl = 0
+                    else:
+                        pl = c.desc.get('player') if c.desc.get('player') is not None else 1
                     if clvl == 2:
                         emit_player_field = True
                     else:
