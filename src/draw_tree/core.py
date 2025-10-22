@@ -1903,6 +1903,33 @@ class DefaultLayout:
         self.assign_x()
         self.set_internal_x(self.root)
         self.assign_levels()
+        # Post-process: ensure every connected parent->child pair has at least
+        # two integer-levels of separation. This enforces the invariant
+        # child.level >= parent.level + 2 for every edge, repeating until
+        # stable so transitive adjustments propagate deterministically.
+        def enforce_spacing():
+            changed = True
+            while changed:
+                changed = False
+                def walk(n):
+                    nonlocal changed
+                    for c in n.children:
+                        try:
+                            plevel = int(round(n.level))
+                            clevel = int(round(c.level))
+                        except Exception:
+                            plevel = int(n.level)
+                            clevel = int(c.level)
+                        if clevel < plevel + 2:
+                            c.level = plevel + 2
+                            changed = True
+                        # always continue walking to enforce transitive constraints
+                        if c.children:
+                            walk(c)
+                if self.root:
+                    walk(self.root)
+
+        enforce_spacing()
         emit_scale, adaptive_mult = self.compute_scale_and_mult()
 
         LEVEL_XSHIFT = {
@@ -1956,6 +1983,50 @@ class DefaultLayout:
         # on the same integer level by relocating groups if necessary.
         try:
             self._separate_iset_levels()
+        except Exception:
+            pass
+
+        # Final spacing enforcement: _separate_iset_levels may have moved
+        # nodes around; ensure now that every connected parent->child pair
+        # has at least two integer levels separation. Update self.node_ids
+        # entries to match any changed node.level and rebuild iset_groups so
+        # subsequent emission uses consistent integer levels.
+        def enforce_spacing_after_separation():
+            changed = True
+            # Repeat until stable because raising one child can require
+            # raising its children as well.
+            while changed:
+                changed = False
+                # iterate over node objects deterministically
+                for node_obj in list(self.node_ids.keys()):
+                    if node_obj.parent is None:
+                        continue
+                    try:
+                        plevel = int(round(node_obj.parent.level))
+                        clevel = int(round(node_obj.level))
+                    except Exception:
+                        plevel = int(node_obj.parent.level)
+                        clevel = int(node_obj.level)
+                    if clevel < plevel + 2:
+                        node_obj.level = plevel + 2
+                        # update node_ids to the new integer level, keep lid
+                        lid = self.node_ids[node_obj][1]
+                        self.node_ids[node_obj] = (int(node_obj.level), lid)
+                        changed = True
+
+            # rebuild iset_groups deterministically from node_ids and descriptors
+            new_iset = {}
+            for nobj, (lv, lid) in list(self.node_ids.items()):
+                if nobj.desc and nobj.desc.get('iset_id') is not None and nobj.desc.get('player') is not None:
+                    key = (nobj.desc['player'], nobj.desc['iset_id'])
+                    new_iset.setdefault(key, []).append((int(round(nobj.level)), lid))
+            # sort entries for determinism
+            for k in new_iset:
+                new_iset[k] = sorted(new_iset[k], key=lambda t: (int(t[0]), int(t[1])))
+            self.iset_groups = new_iset
+
+        try:
+            enforce_spacing_after_separation()
         except Exception:
             pass
 
