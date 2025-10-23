@@ -263,7 +263,7 @@ class TestDrawTreeFunction:
             ef_file_path = ef_file.name
 
         try:
-            result = draw_tree.draw_tree(ef_file_path)
+            result = draw_tree.generate_tikz(ef_file_path)
             
             # Verify the result contains expected components
             assert isinstance(result, str)
@@ -292,15 +292,15 @@ class TestDrawTreeFunction:
 
         try:
             # Test with scale
-            result_scaled = draw_tree.draw_tree(ef_file_path, scale_factor=2.0)
+            result_scaled = draw_tree.generate_tikz(ef_file_path, scale_factor=2.0)
             assert "scale=2" in result_scaled
             
             # Test with grid
-            result_grid = draw_tree.draw_tree(ef_file_path, show_grid=True)
+            result_grid = draw_tree.generate_tikz(ef_file_path, show_grid=True)
             assert "\\draw [help lines, color=green]" in result_grid
             
             # Test without grid (default)
-            result_no_grid = draw_tree.draw_tree(ef_file_path, show_grid=False)
+            result_no_grid = draw_tree.generate_tikz(ef_file_path, show_grid=False)
             assert "% \\draw [help lines, color=green]" in result_no_grid
             
         finally:
@@ -310,7 +310,7 @@ class TestDrawTreeFunction:
         """Test draw_tree with missing files."""
         # Test with missing .ef file
         with pytest.raises(FileNotFoundError):
-            draw_tree.draw_tree("nonexistent.ef")
+            draw_tree.generate_tikz("nonexistent.ef")
 
         # Test with valid .ef file (should work with built-in macros)
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
@@ -318,7 +318,7 @@ class TestDrawTreeFunction:
             ef_file_path = ef_file.name
 
         try:
-            result = draw_tree.draw_tree(ef_file_path)
+            result = draw_tree.generate_tikz(ef_file_path)
             # Should work with built-in macros
             assert "\\begin{tikzpicture}" in result
             assert "\\newcommand\\chancecolor{red}" in result
