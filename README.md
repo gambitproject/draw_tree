@@ -81,10 +81,8 @@ pip install -r requirements.txt
 In a Jupyter notebook, run:
 
 ```python
-%load_ext jupyter_tikz
 from draw_tree import draw_tree
-example_tikz = draw_tree('games/example.ef')
-get_ipython().run_cell_magic("tikz", "", example_tikz)
+draw_tree('games/example.ef')
 ```
 
 ## Developer docs: Testing
