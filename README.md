@@ -2,6 +2,9 @@
 
 Game tree drawing tool for extensive form games that generates TikZ code, LaTeX documents, PDFs, and PNGs.
 
+Pass in an extensive form game file in `.ef` format with layout formatting, and `draw_tree` will generate a visual representation of the game tree.
+You can also pass in a file in `.efg` format, which will be converted to `.ef` internally, applying a default layout.
+
 ## Installation
 
 Clone the repo and install the package using pip:
