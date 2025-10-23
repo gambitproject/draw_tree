@@ -282,6 +282,42 @@ class TestDrawTreeFunction:
         finally:
             os.unlink(ef_file_path)
 
+    def test_draw_tree_uses_ipython_magic(self):
+        """When IPython is available, draw_tree should load the extension and call the tikz cell magic."""
+        from unittest.mock import Mock
+        # Create a simple .ef file for testing
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
+            ef_file.write("player 1\n")
+            ef_file.write("level 0 node root player 1\n")
+            ef_file_path = ef_file.name
+
+        try:
+            fake_ip = Mock()
+            fake_ip.run_line_magic = Mock()
+            fake_ip.run_cell_magic = Mock(return_value="RENDERED")
+
+            # Patch get_ipython in the module to return our fake IPython
+            with patch('draw_tree.core.get_ipython', return_value=fake_ip):
+                result = draw_tree.draw_tree(ef_file_path)
+                assert result == "RENDERED"
+                fake_ip.run_line_magic.assert_called_with("load_ext", "jupyter_tikz")
+                fake_ip.run_cell_magic.assert_called()
+        finally:
+            os.unlink(ef_file_path)
+
+    def test_draw_tree_raises_when_no_ipython(self):
+        """When IPython is not available, draw_tree should raise EnvironmentError."""
+        with patch('draw_tree.core.get_ipython', return_value=None):
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
+                ef_file.write("player 1\n")
+                ef_file.write("level 0 node root player 1\n")
+                ef_file_path = ef_file.name
+            try:
+                with pytest.raises(EnvironmentError):
+                    draw_tree.draw_tree(ef_file_path)
+            finally:
+                os.unlink(ef_file_path)
+
     def test_draw_tree_with_options(self):
         """Test draw_tree with different options."""
         # Create a simple .ef file for testing
