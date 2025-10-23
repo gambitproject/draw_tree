@@ -2,6 +2,9 @@
 
 Game tree drawing tool for extensive form games that generates TikZ code, LaTeX documents, PDFs, and PNGs.
 
+Pass in an extensive form game file in `.ef` format with layout formatting, and `draw_tree` will generate a visual representation of the game tree.
+You can also pass in a file in `.efg` format, which will be converted to `.ef` internally, applying a default layout.
+
 ## Installation
 
 Clone the repo and install the package using pip:
@@ -14,7 +17,7 @@ pip install -e .
 
 ## Requirements
 
-- Python 3.9+ (tested on 3.13)
+- Python 3.10+ (tested on 3.13)
 - LaTeX with TikZ (for PDF/PNG generation)
 - (optional) ImageMagick or Ghostscript or Poppler (for PNG generation)
 
@@ -73,18 +76,11 @@ generate_png('games/example.ef', output_png='mygame.png', scale_factor=0.8)    #
 
 ### Rendering in Jupyter Notebooks
 
-First install the requirements, which include the `jupyter-tikz` extension:
-```bash
-pip install -r requirements.txt
-```
-
 In a Jupyter notebook, run:
 
 ```python
-%load_ext jupyter_tikz
 from draw_tree import draw_tree
-example_tikz = draw_tree('games/example.ef')
-get_ipython().run_cell_magic("tikz", "", example_tikz)
+draw_tree('games/example.ef')
 ```
 
 ## Developer docs: Testing

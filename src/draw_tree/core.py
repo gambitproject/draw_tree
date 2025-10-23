@@ -15,6 +15,7 @@ import re
 
 from pathlib import Path
 from typing import List, Optional 
+from IPython.core.getipython import get_ipython
 
 # Constants
 DEFAULTFILE: str = "example.ef"
@@ -1250,7 +1251,7 @@ def ef_to_tex(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) 
         scale = original_scale
         grid = original_grid
 
-def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
+def generate_tikz(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
     """
     Generate complete TikZ code from an extensive form (.ef) file.
     
@@ -1323,6 +1324,39 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) 
     return tikz_code
 
 
+def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> Optional[str]:
+    """
+    Generate TikZ code and display in Jupyter notebooks.
+    
+    Args:
+        ef_file: Path to the .ef file to process.
+        scale_factor: Scale factor for the diagram (default: 1.0).
+        show_grid: Whether to show grid lines (default: False).
+        
+    Returns:
+        The result of the Jupyter cell magic execution, or the TikZ code string
+        if cell magic fails.
+    """
+    # Ensure we are in a Jupyter notebook environment
+    ip = get_ipython()
+    if ip:
+        # Only attempt to load the extension if it's not already loaded
+        em = getattr(ip, 'extension_manager', None)
+        loaded = getattr(em, 'loaded', None)
+        try:
+            jpt_loaded = 'jupyter_tikz' in loaded  # type: ignore
+        except Exception:
+            jpt_loaded = False
+        if not jpt_loaded:
+            ip.run_line_magic("load_ext", "jupyter_tikz")
+
+        # Generate TikZ code and execute cell magic
+        tikz_code = generate_tikz(ef_file, scale_factor, show_grid)
+        return ip.run_cell_magic("tikz", "", tikz_code)
+    else:
+        raise EnvironmentError("draw_tree function requires a Jupyter notebook environment.")
+
+
 def latex_wrapper(tikz_code: str) -> str:
     """
     Wrap TikZ code in a complete LaTeX document.
@@ -1391,8 +1425,8 @@ def generate_tex(ef_file: str, output_tex: Optional[str] = None, scale_factor: f
         except Exception:
             pass
 
-    # Generate TikZ content using draw_tree
-    tikz_content = draw_tree(ef_file, scale_factor, show_grid)
+    # Generate TikZ content using generate_tikz
+    tikz_content = generate_tikz(ef_file, scale_factor, show_grid)
     
     # Wrap in complete LaTeX document
     latex_document = latex_wrapper(tikz_content)
@@ -1430,8 +1464,8 @@ def generate_pdf(ef_file: str, output_pdf: Optional[str] = None, scale_factor: f
         ef_path = Path(ef_file)
         output_pdf = ef_path.with_suffix('.pdf').name
     
-    # Generate TikZ content using draw_tree
-    tikz_content = draw_tree(ef_file, scale_factor, show_grid)
+    # Generate TikZ content using generate_tikz
+    tikz_content = generate_tikz(ef_file, scale_factor, show_grid)
     
     # Create LaTeX wrapper document
     latex_document = latex_wrapper(tikz_content)
@@ -2233,7 +2267,7 @@ class DefaultLayout:
 
 
 def efg_to_ef(efg_file: str) -> str:
-    """Convert a Gambit .efg file to the `.ef` format used by draw_tree.
+    """Convert a Gambit .efg file to the `.ef` format used by generate_tikz.
 
     The function implements a focused parser and deterministic layout
     heuristics for producing `.ef` directives from a conservative subset of

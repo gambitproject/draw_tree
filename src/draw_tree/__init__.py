@@ -9,6 +9,7 @@ __version__ = "0.1.0"
 
 from .core import (
     draw_tree,
+    generate_tikz,
     generate_tex,
     generate_pdf,
     generate_png,
@@ -19,6 +20,7 @@ from .core import (
 
 __all__ = [
     "draw_tree",
+    "generate_tikz",
     "generate_tex", 
     "generate_pdf",
     "generate_png",

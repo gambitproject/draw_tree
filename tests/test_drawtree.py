@@ -263,7 +263,7 @@ class TestDrawTreeFunction:
             ef_file_path = ef_file.name
 
         try:
-            result = draw_tree.draw_tree(ef_file_path)
+            result = draw_tree.generate_tikz(ef_file_path)
             
             # Verify the result contains expected components
             assert isinstance(result, str)
@@ -282,6 +282,69 @@ class TestDrawTreeFunction:
         finally:
             os.unlink(ef_file_path)
 
+    def test_draw_tree_raises_when_no_ipython(self):
+        """When IPython is not available, draw_tree should raise EnvironmentError."""
+        with patch('draw_tree.core.get_ipython', return_value=None):
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
+                ef_file.write("player 1\n")
+                ef_file.write("level 0 node root player 1\n")
+                ef_file_path = ef_file.name
+            try:
+                with pytest.raises(EnvironmentError):
+                    draw_tree.draw_tree(ef_file_path)
+            finally:
+                os.unlink(ef_file_path)
+
+    def test_draw_tree_calls_ipython_magic_when_available(self):
+        """When IPython is available, draw_tree should load the jupyter_tikz
+        extension if needed and call the tikz cell magic with the generated code.
+        """
+        # Create a simple .ef file for testing
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
+            ef_file.write("player 1\n")
+            ef_file.write("level 0 node root player 1\n")
+            ef_file_path = ef_file.name
+
+        class DummyEM:
+            def __init__(self, loaded=None):
+                self.loaded = loaded or set()
+
+        class DummyIP:
+            def __init__(self, em):
+                self.extension_manager = em
+                self._loaded_magics = []
+                self._run_cell_magic_calls = []
+
+            def run_line_magic(self, name, arg):
+                # record that load_ext was called
+                self._loaded_magics.append((name, arg))
+
+            def run_cell_magic(self, magic_name, args, code):
+                # record call and return a sentinel
+                self._run_cell_magic_calls.append((magic_name, args, code))
+                return "MAGIC-RESULT"
+
+        try:
+            # Case 1: extension already loaded
+            em = DummyEM(loaded={'jupyter_tikz'})
+            ip = DummyIP(em)
+            with patch('draw_tree.core.get_ipython', return_value=ip):
+                res = draw_tree.draw_tree(ef_file_path)
+                # Should call run_cell_magic and return its value
+                assert res == "MAGIC-RESULT"
+
+            # Case 2: extension not loaded -> run_line_magic should be called
+            em2 = DummyEM(loaded=set())
+            ip2 = DummyIP(em2)
+            with patch('draw_tree.core.get_ipython', return_value=ip2):
+                res2 = draw_tree.draw_tree(ef_file_path)
+                assert res2 == "MAGIC-RESULT"
+                # run_line_magic should have been called to load the extension
+                assert ('load_ext', 'jupyter_tikz') in ip2._loaded_magics
+
+        finally:
+            os.unlink(ef_file_path)
+
     def test_draw_tree_with_options(self):
         """Test draw_tree with different options."""
         # Create a simple .ef file for testing
@@ -292,15 +355,15 @@ class TestDrawTreeFunction:
 
         try:
             # Test with scale
-            result_scaled = draw_tree.draw_tree(ef_file_path, scale_factor=2.0)
+            result_scaled = draw_tree.generate_tikz(ef_file_path, scale_factor=2.0)
             assert "scale=2" in result_scaled
             
             # Test with grid
-            result_grid = draw_tree.draw_tree(ef_file_path, show_grid=True)
+            result_grid = draw_tree.generate_tikz(ef_file_path, show_grid=True)
             assert "\\draw [help lines, color=green]" in result_grid
             
             # Test without grid (default)
-            result_no_grid = draw_tree.draw_tree(ef_file_path, show_grid=False)
+            result_no_grid = draw_tree.generate_tikz(ef_file_path, show_grid=False)
             assert "% \\draw [help lines, color=green]" in result_no_grid
             
         finally:
@@ -310,7 +373,7 @@ class TestDrawTreeFunction:
         """Test draw_tree with missing files."""
         # Test with missing .ef file
         with pytest.raises(FileNotFoundError):
-            draw_tree.draw_tree("nonexistent.ef")
+            draw_tree.generate_tikz("nonexistent.ef")
 
         # Test with valid .ef file (should work with built-in macros)
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ef') as ef_file:
@@ -318,7 +381,7 @@ class TestDrawTreeFunction:
             ef_file_path = ef_file.name
 
         try:
-            result = draw_tree.draw_tree(ef_file_path)
+            result = draw_tree.generate_tikz(ef_file_path)
             # Should work with built-in macros
             assert "\\begin{tikzpicture}" in result
             assert "\\newcommand\\chancecolor{red}" in result
