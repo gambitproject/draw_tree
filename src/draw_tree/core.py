@@ -15,7 +15,7 @@ import re
 
 from pathlib import Path
 from typing import List, Optional 
-from IPython import get_ipython
+from IPython.core.getipython import get_ipython
 
 # Constants
 DEFAULTFILE: str = "example.ef"
@@ -1324,7 +1324,7 @@ def generate_tikz(ef_file: str, scale_factor: float = 1.0, show_grid: bool = Fal
     return tikz_code
 
 
-def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
+def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> Optional[str]:
     """
     Generate TikZ code and display in Jupyter notebooks.
     
@@ -1334,12 +1334,25 @@ def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) 
         show_grid: Whether to show grid lines (default: False).
         
     Returns:
-        iPython cell magic
+        The result of the Jupyter cell magic execution, or the TikZ code string
+        if cell magic fails.
     """
-    if get_ipython():
-        get_ipython().run_line_magic("load_ext", "jupyter_tikz")
+    # Ensure we are in a Jupyter notebook environment
+    ip = get_ipython()
+    if ip:
+        # Only attempt to load the extension if it's not already loaded
+        em = getattr(ip, 'extension_manager', None)
+        loaded = getattr(em, 'loaded', None)
+        try:
+            jpt_loaded = 'jupyter_tikz' in loaded  # type: ignore
+        except Exception:
+            jpt_loaded = False
+        if not jpt_loaded:
+            ip.run_line_magic("load_ext", "jupyter_tikz")
+
+        # Generate TikZ code and execute cell magic
         tikz_code = generate_tikz(ef_file, scale_factor, show_grid)
-        return get_ipython().run_cell_magic("tikz", "", tikz_code)
+        return ip.run_cell_magic("tikz", "", tikz_code)
     else:
         raise EnvironmentError("draw_tree function requires a Jupyter notebook environment.")
 
