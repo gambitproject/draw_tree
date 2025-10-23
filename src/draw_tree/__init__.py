@@ -8,6 +8,7 @@ from extensive form (.ef) files, with support for Jupyter notebooks.
 __version__ = "0.1.0"
 
 from .core import (
+    draw_tree,
     generate_tikz,
     generate_tex,
     generate_pdf,
@@ -18,6 +19,7 @@ from .core import (
 )
 
 __all__ = [
+    "draw_tree",
     "generate_tikz",
     "generate_tex", 
     "generate_pdf",

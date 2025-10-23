@@ -15,6 +15,7 @@ import re
 
 from pathlib import Path
 from typing import List, Optional 
+from IPython import get_ipython
 
 # Constants
 DEFAULTFILE: str = "example.ef"
@@ -1321,6 +1322,26 @@ def generate_tikz(ef_file: str, scale_factor: float = 1.0, show_grid: bool = Fal
     tikz_code += tikz_picture_content
 
     return tikz_code
+
+
+def draw_tree(ef_file: str, scale_factor: float = 1.0, show_grid: bool = False) -> str:
+    """
+    Generate TikZ code and display in Jupyter notebooks.
+    
+    Args:
+        ef_file: Path to the .ef file to process.
+        scale_factor: Scale factor for the diagram (default: 1.0).
+        show_grid: Whether to show grid lines (default: False).
+        
+    Returns:
+        iPython cell magic
+    """
+    if get_ipython():
+        get_ipython().run_line_magic("load_ext", "jupyter_tikz")
+        tikz_code = generate_tikz(ef_file, scale_factor, show_grid)
+        return get_ipython().run_cell_magic("tikz", "", tikz_code)
+    else:
+        raise EnvironmentError("draw_tree function requires a Jupyter notebook environment.")
 
 
 def latex_wrapper(tikz_code: str) -> str:
