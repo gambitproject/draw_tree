@@ -5,6 +5,10 @@ Game tree drawing tool for extensive form games that generates TikZ code, LaTeX 
 Pass in an extensive form game file in `.ef` format with layout formatting, and `draw_tree` will generate a visual representation of the game tree.
 You can also pass in a file in `.efg` format, which will be converted to `.ef` internally, applying a default layout.
 
+⚠️⚠️⚠️ Warning: `draw_tree` is currently in early development. ⚠️⚠️⚠️
+
+> `draw_tree` was originally developed by [Bernhard von Stengel](https://www.lse.ac.uk/people/bernhard-von-stengel) at the London School of Economics. It is being developed further as part of the [Gambit project](https://www.gambit-project.org) out of The Alan Turing Institute.
+
 ## Installation
 
 Clone the repo and install the package using pip:
