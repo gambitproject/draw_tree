@@ -76,11 +76,6 @@ generate_png('games/example.ef', output_png='mygame.png', scale_factor=0.8)    #
 
 ### Rendering in Jupyter Notebooks
 
-First install the requirements, which include the `jupyter-tikz` extension:
-```bash
-pip install -r requirements.txt
-```
-
 In a Jupyter notebook, run:
 
 ```python
