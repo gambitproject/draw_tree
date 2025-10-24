@@ -9,6 +9,15 @@ Game tree drawing tool for publication-ready extensive form Game Theory games. G
 
 > `draw_tree` was originally developed by [Bernhard von Stengel](https://www.lse.ac.uk/people/bernhard-von-stengel) at the London School of Economics. It is being developed further as part of the [Gambit project](https://www.gambit-project.org) out of The Alan Turing Institute.
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Requirements](#requirements)
+- [CLI](#cli)
+- [Python API](#python-api)
+- [Rendering in Jupyter Notebooks](#rendering-in-jupyter-notebooks)
+- [Developer docs: Testing](#developer-docs-testing)
+
 ## Installation
 
 Clone the repo and install the package using pip:
