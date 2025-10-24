@@ -93,11 +93,6 @@ draw_tree('games/example.ef')
 
 The project includes a comprehensive test suite using pytest. To run the tests:
 
-Install requirements:
-```bash
-pip install -r requirements.txt
-```
-
 Run all tests:
 ```bash
 pytest tests/ -v
