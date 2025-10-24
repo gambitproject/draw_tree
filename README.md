@@ -87,6 +87,8 @@ from draw_tree import draw_tree
 draw_tree('games/example.ef')
 ```
 
+> ⚠️⚠️⚠️ Warning: Images do not render correctly in notebooks opened in VSCode; open notebooks in Jupyter Lab. ⚠️⚠️⚠️
+
 ## Developer docs: Testing
 
 The project includes a comprehensive test suite using pytest. To run the tests:
