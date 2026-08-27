@@ -135,7 +135,7 @@ def gambit_layout_to_ef(
     nodes_with_normalised_offsets = {}
     for node, node_coords in layout.items():
         nodes_with_normalised_offsets[node] = (node_coords.offset - midpoint) * xshift_multiplier
-    
+
     # Now, build the node lines in the .ef string
     for node, node_coords in layout.items():
 
@@ -174,14 +174,20 @@ def gambit_layout_to_ef(
 
             # Add probability if the parent is a chance player
             if node.parent.player.is_chance:
-                prob = str(node.prior_action.prob).split("/")
+                if hasattr(pygambit.Infoset, "action_probs"):
+                    prob_value = node.parent.infoset.action_probs[
+                        node.prior_action.label
+                    ]
+                else:
+                    prob_value = node.prior_action.prob
+                prob = str(prob_value).split("/")
                 if len(prob) == 2:
                     ef += f"~(\\frac{{{prob[0]}}}{{{prob[1]}}})"
                 elif len(prob) == 1:
                     ef += f"~{prob[0]}"
                 else:
                     # Throw error for unexpected probability format
-                    raise ValueError(f"Unexpected probability format: {node.prior_action.prob}")
+                    raise ValueError(f"Unexpected probability format: {prob_value}")
             ef += " "
 
         # Add payoffs to terminal nodes, if applicable
