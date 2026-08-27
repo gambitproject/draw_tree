@@ -1364,9 +1364,9 @@ def _make_pygambit_game():
     g = pygambit.Game.new_tree(players=["Alice", "Bob"], title="integration_test")
     g.append_move(g.root, g.players["Alice"], ["Left", "Right"])
     g.append_move(g.root.children["Left"], g.players["Bob"], ["Up", "Down"])
-    g.set_outcome(g.root.children["Left"].children["Up"], g.add_outcome([1, 0]))
-    g.set_outcome(g.root.children["Left"].children["Down"], g.add_outcome([0, 1]))
-    g.set_outcome(g.root.children["Right"], g.add_outcome([2, 2]))
+    g.set_outcome(g.root.children["Left"].children["Up"], g.add_outcome("up", [1, 0]))
+    g.set_outcome(g.root.children["Left"].children["Down"], g.add_outcome("down", [0, 1]))
+    g.set_outcome(g.root.children["Right"], g.add_outcome("right", [2, 2]))
     return g
 
 
