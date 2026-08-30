@@ -30,6 +30,30 @@ def _prior_action_prob(node):
         return node.parent.action_probs[node.prior_action.label]
 
 
+def _player_label(player):
+    """Return the label of a player.
+
+    Works with both pre- and post-Player-removal pygambit: before the removal,
+    `player` is a `Player` object with a `.label` property; after it, `player`
+    already is the label itself.
+    """
+    return getattr(player, "label", player)
+
+
+def _is_chance_node(node):
+    """Return whether `node` is a chance node.
+
+    Works across pygambit's Infoset/Event split and the later removal of
+    `Player.is_chance`: post-split, `Node.event` is truthy only at chance nodes,
+    regardless of whether `Player` still exists; pre-split pygambit has no
+    `Node.event` at all, so this falls back to the older `Node.player.is_chance`.
+    """
+    try:
+        return bool(node.event)
+    except AttributeError:
+        return node.player.is_chance
+
+
 def determine_node_level(
     gbt_level: int,
     gbt_sublevel: int,
@@ -101,9 +125,9 @@ def gambit_layout_to_ef(
     player_ids = {}
     p = 1
     for player in game.players:
-        player_name = player.label.replace(" ", "~")
+        player_name = _player_label(player).replace(" ", "~")
         ef += f"player {p} name {player_name}\n"
-        player_ids[player] = p
+        player_ids[_player_label(player)] = p
         p += 1
 
     # Group nodes by their infosets
@@ -171,10 +195,10 @@ def gambit_layout_to_ef(
         # Determine the player for the node
         player = None
         if node.player:
-            if node.player.is_chance:
+            if _is_chance_node(node):
                 player = "0"
             else:
-                player = player_ids[node.player]
+                player = player_ids[_player_label(node.player)]
 
         # Add the level and globally unique node ID (EF 3.0)
         level = node_levels[node]
@@ -202,7 +226,7 @@ def gambit_layout_to_ef(
                 ef += f"move {prior_action_label}"
 
             # Add probability if the parent is a chance player
-            if node.parent.player.is_chance:
+            if _is_chance_node(node.parent):
                 action_prob = _prior_action_prob(node)
                 prob = str(action_prob).split("/")
                 if len(prob) == 2:
@@ -228,7 +252,7 @@ def gambit_layout_to_ef(
             ef += "iset "
             for node in nodes:
                 ef += f"{node_global_ids[node]} "
-            ef += f"player {player_ids[node.player]} "
+            ef += f"player {player_ids[_player_label(node.player)]} "
             ef += "\n"
 
     # Save the constructed .ef string to file based on the game's name
