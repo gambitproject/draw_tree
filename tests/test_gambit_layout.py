@@ -28,6 +28,18 @@ from gtdraw.gambit_layout import determine_node_level, gambit_layout_to_ef
 # ---------------------------------------------------------------------------
 
 
+def _join_infoset(game, node, reference_node):
+    """Attach `node`'s move to the same information set as `reference_node`.
+
+    Works with both pygambit's pre- and post-Infoset-redesign `append_infoset`:
+    before the redesign it takes an `Infoset`, after it takes a `Node` directly.
+    """
+    try:
+        game.append_infoset(node, reference_node)
+    except TypeError:
+        game.append_infoset(node, reference_node.infoset)
+
+
 def _simple_game(title="test_game"):
     """Create a minimal 2-player game: Alice chooses Left/Right, terminal payoffs."""
     g = pygambit.Game.new_tree(players=["Alice", "Bob"], title=title)
@@ -256,7 +268,7 @@ class TestInformationSets:
         g = pygambit.Game.new_tree(players=["Alice", "Bob"], title="iset")
         g.append_move(g.root, g.players["Alice"], ["Left", "Right"])
         g.append_move(g.root.children["Left"], g.players["Bob"], ["Up", "Down"])
-        g.append_infoset(g.root.children["Right"], g.root.children["Left"].infoset)
+        _join_infoset(g, g.root.children["Right"], g.root.children["Left"])
         for c in g.root.children:
             g.set_outcome(c.children["Up"], g.add_outcome([1, 0]))
             g.set_outcome(c.children["Down"], g.add_outcome([0, 1]))
@@ -275,7 +287,7 @@ class TestInformationSets:
         g = pygambit.Game.new_tree(players=["Alice", "Bob"], title="isnp")
         g.append_move(g.root, g.players["Alice"], ["L", "R"])
         g.append_move(g.root.children["L"], g.players["Bob"], ["U", "D"])
-        g.append_infoset(g.root.children["R"], g.root.children["L"].infoset)
+        _join_infoset(g, g.root.children["R"], g.root.children["L"])
         for c in g.root.children:
             g.set_outcome(c.children["U"], g.add_outcome([1, 0]))
             g.set_outcome(c.children["D"], g.add_outcome([0, 1]))
