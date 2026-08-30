@@ -2,6 +2,34 @@ import pygambit
 from typing import Optional
 
 
+def _partition(node):
+    """Return the information set or event `node` currently belongs to, whichever
+    applies, or a falsy value if neither does.
+
+    Works with both pygambit's pre- and post-Infoset/Event-split `Node.infoset`:
+    before the split, `Node.infoset` alone covers both personal information sets
+    and chance events; after it, chance nodes need `Node.event` instead.
+    """
+    try:
+        return node.infoset or node.event
+    except AttributeError:
+        return node.infoset
+
+
+def _prior_action_prob(node):
+    """Return the probability of the chance action leading to `node`.
+
+    Works with both pygambit's pre- and post-Action-removal APIs: before the
+    removal, `Node.prior_action` is an `Action` with a `.prob` property;
+    after it, `Node.prior_action` no longer carries probability information,
+    and it must be read via the parent's `Node.action_probs` instead.
+    """
+    try:
+        return node.prior_action.prob
+    except AttributeError:
+        return node.parent.action_probs[node.prior_action.label]
+
+
 def determine_node_level(
     gbt_level: int,
     gbt_sublevel: int,
@@ -86,10 +114,11 @@ def gambit_layout_to_ef(
     gbt_highest_level = 0
     gbt_highest_sublevel = 0
     for node, node_coords in layout.items():
-        if node.infoset:
-            if node.infoset not in infoset_groups:
-                infoset_groups[node.infoset] = []
-            infoset_groups[node.infoset].append(node)
+        partition = _partition(node)
+        if partition:
+            if partition not in infoset_groups:
+                infoset_groups[partition] = []
+            infoset_groups[partition].append(node)
         # Get the level of a parent node, if applicable
         if not node == game.root:
             parent_coords = layout[node.parent]
@@ -154,7 +183,7 @@ def gambit_layout_to_ef(
 
         # Add player if applicable to this node
         # Do not add player if in infoset with multiple nodes (will be defined by `iset` later)
-        if player and len(infoset_groups[node.infoset]) == 1:
+        if player and len(infoset_groups[_partition(node)]) == 1:
             ef += f"player {player} "
 
         # Calculate xshift and add to .ef string not root node
@@ -174,14 +203,15 @@ def gambit_layout_to_ef(
 
             # Add probability if the parent is a chance player
             if node.parent.player.is_chance:
-                prob = str(node.prior_action.prob).split("/")
+                action_prob = _prior_action_prob(node)
+                prob = str(action_prob).split("/")
                 if len(prob) == 2:
                     ef += f"~(\\frac{{{prob[0]}}}{{{prob[1]}}})"
                 elif len(prob) == 1:
                     ef += f"~{prob[0]}"
                 else:
                     # Throw error for unexpected probability format
-                    raise ValueError(f"Unexpected probability format: {node.prior_action.prob}")
+                    raise ValueError(f"Unexpected probability format: {action_prob}")
             ef += " "
 
         # Add payoffs to terminal nodes, if applicable
