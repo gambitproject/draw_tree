@@ -6,17 +6,18 @@ including unit tests for utility functions, integration tests for file processin
 and validation of TikZ output generation.
 """
 
-import pytest
+import os
 import shutil
 import tempfile
-import os
 from pathlib import Path
 from unittest.mock import patch
 
 import pygambit
+import pytest
 
 # Import the module under test
 import gtdraw.core as core
+from _pygambit_compat import append_move as _append_move, set_outcome as _set_outcome
 from gtdraw.converter import ef_to_efg, efg_to_ef
 
 
@@ -1362,11 +1363,11 @@ def _simple_ef_content():
 def _make_pygambit_game():
     """Create a small pygambit game for end-to-end tests."""
     g = pygambit.Game.new_tree(players=["Alice", "Bob"], title="integration_test")
-    g.append_move(g.root, g.players["Alice"], ["Left", "Right"])
-    g.append_move(g.root.children["Left"], g.players["Bob"], ["Up", "Down"])
-    g.set_outcome(g.root.children["Left"].children["Up"], g.add_outcome([1, 0]))
-    g.set_outcome(g.root.children["Left"].children["Down"], g.add_outcome([0, 1]))
-    g.set_outcome(g.root.children["Right"], g.add_outcome([2, 2]))
+    _append_move(g, g.root, "Alice", ["Left", "Right"])
+    _append_move(g, g.root.children["Left"], "Bob", ["Up", "Down"])
+    _set_outcome(g, g.root.children["Left"].children["Up"], [1, 0])
+    _set_outcome(g, g.root.children["Left"].children["Down"], [0, 1])
+    _set_outcome(g, g.root.children["Right"], [2, 2])
     return g
 
 
