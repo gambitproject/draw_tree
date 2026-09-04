@@ -3,17 +3,31 @@ from typing import Optional
 
 
 def _partition(node):
-    """Return the information set or event `node` currently belongs to, whichever
-    applies, or a falsy value if neither does.
+    """Return a value identifying the information set or event `node` currently
+    belongs to, whichever applies, or a falsy value if neither does. Two nodes in
+    the same information set/event return equal values; the value itself carries
+    no other meaning.
 
-    Works with both pygambit's pre- and post-Infoset/Event-split `Node.infoset`:
-    before the split, `Node.infoset` alone covers both personal information sets
-    and chance events; after it, chance nodes need `Node.event` instead.
+    Works across three pygambit APIs: oldest, `Node.infoset` alone covers both
+    personal information sets and chance events; post-Infoset/Event-split, chance
+    nodes need `Node.event` instead; after that split was itself removed, neither
+    exists, and a node's partition is identified instead by its own `Node.members`
+    (identical, in content and order, for every node sharing a partition -- and
+    raises `AttributeError` for a terminal node, matching the falsy behaviour of
+    the older `Node.infoset`/`Node.event`).
     """
     try:
         return node.infoset or node.event
     except AttributeError:
+        pass
+    try:
         return node.infoset
+    except AttributeError:
+        pass
+    try:
+        return tuple(node.members)
+    except AttributeError:
+        return None
 
 
 def _prior_action_prob(node):
@@ -43,15 +57,23 @@ def _player_label(player):
 def _is_chance_node(node):
     """Return whether `node` is a chance node.
 
-    Works across pygambit's Infoset/Event split and the later removal of
-    `Player.is_chance`: post-split, `Node.event` is truthy only at chance nodes,
-    regardless of whether `Player` still exists; pre-split pygambit has no
-    `Node.event` at all, so this falls back to the older `Node.player.is_chance`.
+    Works across pygambit's Infoset/Event split, the later removal of
+    `Player.is_chance`, and the eventual removal of `Node.event` itself:
+    post-split, `Node.event` is truthy only at chance nodes, regardless of
+    whether `Player` still exists; pre-split pygambit has no `Node.event` at
+    all, so this falls back to the older `Node.player.is_chance`; once `Node`
+    no longer has an `.event` and `Node.player` is already a plain label (`str`,
+    following `Player`'s own removal), the chance player is identified by its
+    fixed (never user-assigned) label, "Chance".
     """
     try:
         return bool(node.event)
     except AttributeError:
+        pass
+    try:
         return node.player.is_chance
+    except AttributeError:
+        return node.player == "Chance"
 
 
 def determine_node_level(
